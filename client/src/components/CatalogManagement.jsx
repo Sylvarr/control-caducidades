@@ -29,6 +29,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState(null);
 
   // Filtrar y agrupar productos
   const groupedProducts = useMemo(() => {
@@ -157,8 +158,17 @@ const CatalogManagement = ({ isOpen, onClose }) => {
   const renderProduct = (product) => (
     <div
       key={product._id}
-      className="flex items-center justify-between p-3 bg-gray-50 rounded-md
-        hover:bg-gray-100 transition-colors group"
+      onClick={() =>
+        setSelectedProductId(
+          selectedProductId === product._id ? null : product._id
+        )
+      }
+      className={`
+        flex items-center justify-between p-3 
+        ${selectedProductId === product._id ? "bg-gray-100" : "bg-gray-50"}
+        rounded-md transition-colors
+        active:bg-gray-200
+      `}
     >
       <div className="flex items-center gap-3">
         <Tag
@@ -172,14 +182,20 @@ const CatalogManagement = ({ isOpen, onClose }) => {
       {deleteConfirm === product._id ? (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => handleDeleteProduct(product._id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteProduct(product._id);
+            }}
             className="px-3 py-1 bg-red-600 text-white text-sm rounded
               hover:bg-red-700 transition-colors"
           >
             Confirmar
           </button>
           <button
-            onClick={() => setDeleteConfirm(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteConfirm(null);
+            }}
             className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded
               hover:bg-gray-300 transition-colors"
           >
@@ -187,13 +203,18 @@ const CatalogManagement = ({ isOpen, onClose }) => {
           </button>
         </div>
       ) : (
-        <button
-          onClick={() => setDeleteConfirm(product._id)}
-          className="p-2 text-gray-400 hover:text-red-600 transition-colors
-            opacity-0 group-hover:opacity-100 rounded-full hover:bg-red-50"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
+        selectedProductId === product._id && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteConfirm(product._id);
+            }}
+            className="p-2 text-gray-400 hover:text-red-600 transition-colors
+            rounded-full hover:bg-red-50"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        )
       )}
     </div>
   );

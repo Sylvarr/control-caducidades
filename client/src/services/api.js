@@ -1,3 +1,8 @@
+// API Base URL basada en el entorno
+const API_BASE_URL = import.meta.env.PROD
+  ? "https://tudominio.com/api" // URL de producción
+  : "http://localhost:5000/api"; // URL de desarrollo
+
 // Función auxiliar para obtener el token
 const getAuthToken = () => {
   return localStorage.getItem("token") || sessionStorage.getItem("token");
@@ -16,18 +21,32 @@ const getHeaders = (contentType = false) => {
   return headers;
 };
 
+// Función auxiliar para manejar errores de la API
+const handleApiError = async (response) => {
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    const errorData = await response.json();
+    throw new Error(
+      errorData.error || errorData.message || "Error en la petición"
+    );
+  }
+  throw new Error("Error en la petición");
+};
+
 // Obtener todos los estados de productos
 export const getAllProductStatus = async () => {
   try {
-    const response = await fetch("http://localhost:5000/api/status", {
+    const response = await fetch(`${API_BASE_URL}/status`, {
       headers: getHeaders(),
     });
+
     if (!response.ok) {
-      throw new Error("Error al obtener los estados");
+      await handleApiError(response);
     }
+
     return await response.json();
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error en getAllProductStatus:", error);
     throw error;
   }
 };
@@ -37,18 +56,14 @@ export const updateProductStatus = async (productId, data) => {
   try {
     console.log(`Enviando actualización para producto ${productId}:`, data);
 
-    const response = await fetch(
-      `http://localhost:5000/api/status/${productId}`,
-      {
-        method: "PUT",
-        headers: getHeaders(true),
-        body: JSON.stringify(data),
-      }
-    );
+    const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
+      method: "PUT",
+      headers: getHeaders(true),
+      body: JSON.stringify(data),
+    });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Error en la actualización");
+      await handleApiError(response);
     }
 
     return await response.json();
@@ -64,7 +79,7 @@ export const getAllCatalogProducts = async () => {
     console.log("Obteniendo productos del catálogo...");
     console.log("Token disponible:", !!getAuthToken());
 
-    const response = await fetch("http://localhost:5000/api/catalog", {
+    const response = await fetch(`${API_BASE_URL}/catalog`, {
       headers: getHeaders(),
     });
 
@@ -75,34 +90,30 @@ export const getAllCatalogProducts = async () => {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Error al obtener el catálogo");
+      await handleApiError(response);
     }
 
     return await response.json();
   } catch (error) {
-    console.error("Error completo:", error);
+    console.error("Error en getAllCatalogProducts:", error);
     throw error;
   }
 };
 
 export const deleteProductStatus = async (productId) => {
   try {
-    const response = await fetch(
-      `http://localhost:5000/api/status/${productId}`,
-      {
-        method: "DELETE",
-        headers: getHeaders(),
-      }
-    );
+    const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
 
     if (!response.ok) {
-      throw new Error("Error al desclasificar el producto");
+      await handleApiError(response);
     }
 
     return await response.json();
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error en deleteProductStatus:", error);
     throw error;
   }
 };

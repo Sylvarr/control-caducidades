@@ -348,9 +348,29 @@ const ProductList = () => {
 
   // Función para manejar el clic en un producto
   const handleProductClick = useCallback((product) => {
-    setSelectedProduct((current) =>
-      current?.producto?._id === product.producto?._id ? null : product
-    );
+    setSelectedProduct((current) => {
+      const newSelected =
+        current?.producto?._id === product.producto?._id ? null : product;
+
+      // Si se está seleccionando un producto (no deseleccionando)
+      if (newSelected) {
+        // Pequeño delay para permitir que el contenido se expanda
+        setTimeout(() => {
+          const productElement = document.querySelector(
+            `[data-product-id="${product.producto?._id}"]`
+          );
+          if (productElement) {
+            productElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "nearest",
+            });
+          }
+        }, 100);
+      }
+
+      return newSelected;
+    });
   }, []);
 
   // Función para manejar la actualización
@@ -812,7 +832,7 @@ const ProductList = () => {
           {/* Fondo oscuro clickeable */}
           <div
             className="fixed inset-0 bg-black/50 transition-opacity duration-300"
-            onClick={() => setShowUnclassified(false)}
+            onClick={handleCloseUnclassified}
           />
 
           {/* Contenido del modal */}
@@ -845,20 +865,16 @@ const ProductList = () => {
 
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-2">
-                {products["sin-clasificar"].map((product, index) => {
+                {products["sin-clasificar"].map((product) => {
                   const isSelected =
                     selectedProduct?.producto?._id === product.producto?._id;
                   return (
-                    <button
+                    <div
                       key={product.producto?._id}
                       data-product-id={product.producto?._id}
                       onClick={(e) => {
                         handleProductClick(product);
                         handleUpdateClick(product, e);
-                      }}
-                      style={{
-                        animationDelay: `${index * 50}ms`,
-                        animationFillMode: "forwards",
                       }}
                       className={`
                         w-full text-left 
@@ -869,13 +885,13 @@ const ProductList = () => {
                         ${isSelected ? "ring-1 ring-[#1d5030]/30" : ""}
                         active:scale-[0.995]
                         p-4 product-card
-                        animate-scale-in opacity-0
+                        cursor-pointer
                       `}
                     >
                       <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block transition-colors duration-200">
                         {product.producto?.nombre}
                       </span>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -894,7 +910,7 @@ const ProductList = () => {
                 key={category}
                 className={`category-section ${index > 0 ? "mt-6" : ""}`}
               >
-                {/* Header de categoría mejorado */}
+                {/* Header de categoría */}
                 <h2
                   className="
                   bg-[#f3f4f6] 
@@ -910,13 +926,13 @@ const ProductList = () => {
                   {CATEGORY_TITLES[category]}
                 </h2>
 
-                {/* Lista de productos con mejor espaciado y diseño */}
+                {/* Lista de productos */}
                 <div className="space-y-2 ml-2">
                   {productList.map((product) => {
                     const isSelected =
                       selectedProduct?.producto?._id === product.producto?._id;
                     return (
-                      <button
+                      <div
                         key={product.producto?._id}
                         data-product-id={product.producto?._id}
                         onClick={() => handleProductClick(product)}
@@ -934,6 +950,7 @@ const ProductList = () => {
                           }
                           active:scale-[0.995]
                           p-4 product-card
+                          cursor-pointer
                         `}
                       >
                         <div className="flex items-center gap-2">
@@ -1019,7 +1036,10 @@ const ProductList = () => {
                             )}
                             <div className="flex items-center justify-between pt-2">
                               <button
-                                onClick={(e) => handleUpdateClick(product, e)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateClick(product, e);
+                                }}
                                 className="flex-1 py-2 text-white rounded-md
                                   bg-[#1d5030] hover:bg-[#1d5030]/90
                                   transition-colors duration-200
@@ -1035,7 +1055,10 @@ const ProductList = () => {
                                 product.fechaFrente ||
                                 product.fechaAlmacen) && (
                                 <button
-                                  onClick={(e) => handleDeleteClick(product, e)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteClick(product, e);
+                                  }}
                                   className="min-w-[48px] h-[40px] flex items-center justify-center
                                     text-gray-400 rounded-md
                                     hover:text-red-500 hover:bg-red-50
@@ -1048,7 +1071,7 @@ const ProductList = () => {
                             </div>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1191,7 +1214,7 @@ const ProductList = () => {
         </div>
       )}
 
-      {/* Añadir el modal de próximas caducidades */}
+      {/* Modal de productos próximos a caducar */}
       {isExpiringModalOpen && (
         <div
           className={`
@@ -1207,7 +1230,7 @@ const ProductList = () => {
           {/* Fondo oscuro clickeable */}
           <div
             className="fixed inset-0 bg-black/50 transition-opacity"
-            onClick={() => setIsExpiringModalOpen(false)}
+            onClick={handleCloseExpiringModal}
           />
 
           {/* Contenido del modal */}
@@ -1257,7 +1280,7 @@ const ProductList = () => {
                         {products
                           .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
                           .map((product) => (
-                            <button
+                            <div
                               key={product.producto._id}
                               onClick={() => navigateToProduct(product)}
                               className={`
@@ -1265,7 +1288,7 @@ const ProductList = () => {
                                 hover:bg-gray-50 active:bg-gray-100 
                                 transition-colors duration-200
                                 flex items-start gap-4 group
-                                p-4
+                                p-4 cursor-pointer
                                 ${key === "expired" ? "bg-red-50" : ""} 
                               `}
                             >
@@ -1338,7 +1361,7 @@ const ProductList = () => {
                               >
                                 <ChevronRight className="w-5 h-5" />
                               </div>
-                            </button>
+                            </div>
                           ))}
                       </div>
                     </div>

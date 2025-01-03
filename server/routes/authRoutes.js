@@ -1,50 +1,26 @@
 const express = require("express");
 const router = express.Router();
-const { check } = require("express-validator");
+const authController = require("../controllers/authController");
 const {
-  login,
-  register,
-  getCurrentUser,
-  getUsers,
-  deleteUser,
-} = require("../controllers/authController");
-const { verifyToken, isSupervisor } = require("../middleware/auth");
+  loginLimiter,
+  verifyToken,
+  isSupervisor,
+} = require("../middleware/auth");
 
-// Login
-router.post(
-  "/login",
-  [
-    check("username", "El nombre de usuario es requerido").not().isEmpty(),
-    check("password", "La contraseña es requerida").not().isEmpty(),
-  ],
-  login
-);
+// Rutas públicas
+router.post("/login", loginLimiter, authController.login);
 
-// Registro (solo supervisores)
-router.post(
-  "/register",
-  [
-    verifyToken,
-    isSupervisor,
-    check("username", "El nombre de usuario es requerido").not().isEmpty(),
-    check(
-      "password",
-      "La contraseña debe tener al menos 6 caracteres"
-    ).isLength({
-      min: 6,
-    }),
-    check("role", "El rol es requerido").not().isEmpty(),
-  ],
-  register
-);
+// Rutas protegidas
+router.use(verifyToken);
 
-// Obtener usuario actual
-router.get("/me", verifyToken, getCurrentUser);
+// Rutas para usuarios autenticados
+router.get("/me", authController.getCurrentUser);
+router.put("/change-password", authController.changePassword);
 
-// Obtener todos los usuarios (solo supervisores)
-router.get("/users", [verifyToken, isSupervisor], getUsers);
-
-// Eliminar usuario (solo supervisores)
-router.delete("/users/:userId", [verifyToken, isSupervisor], deleteUser);
+// Rutas solo para supervisores
+router.get("/users", isSupervisor, authController.getAllUsers);
+router.post("/users", isSupervisor, authController.createUser);
+router.put("/users/:id", isSupervisor, authController.updateUser);
+router.delete("/users/:id", isSupervisor, authController.deleteUser);
 
 module.exports = router;
