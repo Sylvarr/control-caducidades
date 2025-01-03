@@ -626,7 +626,7 @@ const ProductList = () => {
       {/* Lista de productos sin clasificar */}
       {showUnclassified && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-20"
+          className="fixed inset-0 z-50 flex items-start justify-center pt-20 animate-fade-in"
           onClick={(e) => {
             // Solo cerrar si se hace clic en el fondo oscuro
             if (e.target === e.currentTarget) {
@@ -636,7 +636,7 @@ const ProductList = () => {
         >
           {/* Fondo oscuro clickeable */}
           <div
-            className="fixed inset-0 bg-black/50 transition-opacity"
+            className="fixed inset-0 bg-black/50 transition-opacity duration-300"
             onClick={() => setShowUnclassified(false)}
           />
 
@@ -646,39 +646,46 @@ const ProductList = () => {
             relative w-full max-w-md mx-4
             bg-white rounded-lg
             shadow-xl
-            max-h-[70vh] overflow-hidden
+            max-h-[calc(100vh-8rem)] flex flex-col
             z-10
-          "
+            animate-slide-down
+            transition-all duration-300 ease-out
+            "
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+            <div className="flex-none sticky top-0 z-10 bg-white border-b border-gray-200">
               <div className="px-4 py-3 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-[#1d5030]">
                   Productos Sin Clasificar
-                  <span className="ml-2 text-sm font-medium text-gray-500">
+                  <span className="ml-2 text-sm font-medium text-gray-500 transition-all duration-200">
                     ({products["sin-clasificar"].length})
                   </span>
                 </h2>
                 <button
                   onClick={() => setShowUnclassified(false)}
-                  className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                  className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-all duration-200"
                 >
                   <X className="w-5 h-5 text-gray-500" />
                 </button>
               </div>
             </div>
 
-            <div className="overflow-y-auto p-2">
+            <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-2">
-                {products["sin-clasificar"].map((product) => {
+                {products["sin-clasificar"].map((product, index) => {
                   const isSelected =
                     selectedProduct?.producto?._id === product.producto?._id;
                   return (
                     <button
                       key={product.producto?._id}
                       data-product-id={product.producto?._id}
-                      onClick={() => {
+                      onClick={(e) => {
                         handleProductClick(product);
-                        setShowUnclassified(false);
+                        handleUpdateClick(product, e);
+                      }}
+                      style={{
+                        animationDelay: `${index * 50}ms`,
+                        animationFillMode: "forwards",
                       }}
                       className={`
                         w-full text-left 
@@ -689,9 +696,10 @@ const ProductList = () => {
                         ${isSelected ? "ring-1 ring-[#1d5030]/30" : ""}
                         active:scale-[0.995]
                         p-4 product-card
+                        animate-scale-in opacity-0
                       `}
                     >
-                      <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block">
+                      <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block transition-colors duration-200">
                         {product.producto?.nombre}
                       </span>
                     </button>
@@ -873,18 +881,33 @@ const ProductList = () => {
       {/* Modal de actualización */}
       {isUpdateModalOpen && (
         <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-fade-in"
           onClick={(e) => {
-            // Solo cerrar si se hace clic en el fondo oscuro, no en el contenido del modal
             if (e.target === e.currentTarget) {
               setIsUpdateModalOpen(false);
               setEditingProduct(null);
             }
           }}
         >
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          {/* Fondo oscuro clickeable */}
+          <div
+            className="fixed inset-0 bg-black/50 transition-opacity duration-300"
+            onClick={() => {
+              setIsUpdateModalOpen(false);
+              setEditingProduct(null);
+            }}
+          />
+
+          <div
+            className="
+            relative z-10
+            bg-white rounded-lg p-6 w-full max-w-md
+            animate-scale-in
+            transform transition-all duration-300 ease-out
+          "
+          >
             <h3 className="text-xl font-semibold text-[#2d3748] mb-6">
-              Actualizar Estado
+              Actualizar estado de {editingProduct?.producto?.nombre}
             </h3>
 
             <div className="space-y-5">
