@@ -8,6 +8,7 @@ import { useState, useEffect, createContext } from "react";
 import PropTypes from "prop-types";
 import ProductList from "./components/ProductList";
 import Login from "./components/Login";
+import { SocketProvider } from "./contexts/SocketContext";
 
 // Crear contexto de autenticación
 export const AuthContext = createContext(null);
@@ -66,22 +67,24 @@ const App = () => {
 
   return (
     <AuthContext.Provider value={authContextValue}>
-      <Router>
-        <Routes>
-          <Route
-            path="/login"
-            element={isAuthenticated ? <Navigate to="/" /> : <Login />}
-          />
-          <Route
-            path="/"
-            element={
-              <PrivateRoute>
-                <ProductList />
-              </PrivateRoute>
-            }
-          />
-        </Routes>
-      </Router>
+      <SocketProvider>
+        <Router>
+          <Routes>
+            <Route
+              path="/login"
+              element={isAuthenticated ? <Navigate to="/" /> : <Login />}
+            />
+            <Route
+              path="/"
+              element={
+                <PrivateRoute>
+                  <ProductList />
+                </PrivateRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </SocketProvider>
     </AuthContext.Provider>
   );
 };

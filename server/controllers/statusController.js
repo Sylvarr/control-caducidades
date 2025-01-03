@@ -61,11 +61,25 @@ exports.updateStatus = async (req, res) => {
     try {
       // Intentar guardar y capturar cualquier error de validación
       const savedStatus = await productStatus.save();
-      console.log("Estado guardado exitosamente:", savedStatus);
-      res.json(savedStatus);
+
+      // Obtener el estado con la información completa del producto
+      const populatedStatus = await ProductStatus.findById(
+        savedStatus._id
+      ).populate("producto", "nombre tipo activo");
+
+      console.log("Estado guardado y poblado:", populatedStatus);
+
+      // Usar la instancia global de Socket.IO
+      if (global.io) {
+        global.io.emit("productStatusUpdate", {
+          type: productStatus.isNew ? "create" : "update",
+          productStatus: populatedStatus,
+        });
+      }
+
+      res.json(populatedStatus);
     } catch (saveError) {
       console.error("Error al guardar el estado:", saveError);
-      // Si hay errores de validación, los enviamos en la respuesta
       if (saveError.errors) {
         const validationErrors = Object.keys(saveError.errors).map((key) => ({
           field: key,
@@ -91,7 +105,18 @@ exports.updateStatus = async (req, res) => {
 exports.deleteStatus = async (req, res) => {
   try {
     const { productoId } = req.params;
-    await ProductStatus.findOneAndDelete({ producto: productoId });
+    const deletedStatus = await ProductStatus.findOneAndDelete({
+      producto: productoId,
+    });
+
+    if (deletedStatus && global.io) {
+      // Usar la instancia global de Socket.IO
+      global.io.emit("productStatusUpdate", {
+        type: "delete",
+        productId: productoId,
+      });
+    }
+
     res.json({ message: "Estado eliminado correctamente" });
   } catch (error) {
     console.error("Error:", error);

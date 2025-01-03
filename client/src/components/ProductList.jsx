@@ -25,6 +25,7 @@ import ToastContainer from "./ToastContainer";
 import PropTypes from "prop-types";
 import UserManagement from "./UserManagement";
 import CatalogManagement from "./CatalogManagement";
+import { useSocket } from "../contexts/SocketContext";
 
 // Constantes y funciones de utilidad
 const CATEGORY_TITLES = {
@@ -138,6 +139,7 @@ const ProductList = () => {
     setIsAuthenticated,
     setUser,
   } = useContext(AuthContext);
+  const { socket } = useSocket();
 
   const handleLogout = () => {
     // Limpiar token
@@ -653,6 +655,76 @@ const ProductList = () => {
       setIsClosingExpiringModal(false);
     }, 150);
   };
+
+  // Efecto para manejar eventos de WebSocket
+  useEffect(() => {
+    if (!socket) return;
+
+    // Manejar actualizaciones de estado de productos
+    socket.on("productStatusUpdate", (data) => {
+      console.log("Recibida actualización de estado:", data);
+
+      if (data.type === "create" || data.type === "update") {
+        // Asegurarse de que tenemos toda la información necesaria
+        if (!data.productStatus || !data.productStatus.producto) {
+          console.error("Datos de producto incompletos:", data);
+          return;
+        }
+
+        // Actualizar el estado local con el nuevo estado del producto
+        setProducts((prevProducts) => {
+          const newProducts = { ...prevProducts };
+
+          // Eliminar el producto de su categoría actual si existe
+          Object.keys(newProducts).forEach((category) => {
+            newProducts[category] = newProducts[category].filter(
+              (p) => p.producto?._id !== data.productStatus.producto._id
+            );
+          });
+
+          // Añadir el producto a su nueva categoría
+          const targetCategory = data.productStatus.estado || "sin-clasificar";
+          if (newProducts[targetCategory]) {
+            // Asegurarse de que el producto tiene toda la información necesaria
+            const completeProductStatus = {
+              ...data.productStatus,
+              producto: {
+                ...data.productStatus.producto,
+                nombre: data.productStatus.producto.nombre || "Sin nombre",
+                tipo: data.productStatus.producto.tipo || "permanente",
+                activo: data.productStatus.producto.activo ?? true,
+              },
+            };
+
+            newProducts[targetCategory].push(completeProductStatus);
+          }
+
+          return newProducts;
+        });
+      } else if (data.type === "delete") {
+        // Mover el producto a sin-clasificar
+        setProducts((prevProducts) => {
+          const newProducts = { ...prevProducts };
+
+          // Encontrar y eliminar el producto de su categoría actual
+          Object.keys(newProducts).forEach((category) => {
+            if (category !== "sin-clasificar") {
+              newProducts[category] = newProducts[category].filter(
+                (p) => p.producto?._id !== data.productId
+              );
+            }
+          });
+
+          return newProducts;
+        });
+      }
+    });
+
+    // Limpiar suscripciones al desmontar
+    return () => {
+      socket.off("productStatusUpdate");
+    };
+  }, [socket]);
 
   // Renderizado condicional para estados de carga y error
   if (loading) {

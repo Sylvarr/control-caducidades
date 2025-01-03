@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import PropTypes from "prop-types";
 import CreateProductModal from "./CreateProductModal";
+import { useSocket } from "../contexts/SocketContext";
 
 const TYPE_STYLES = {
   permanente: {
@@ -30,6 +31,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState(null);
+  const { socket } = useSocket();
 
   // Filtrar y agrupar productos
   const groupedProducts = useMemo(() => {
@@ -218,6 +220,33 @@ const CatalogManagement = ({ isOpen, onClose }) => {
       )}
     </div>
   );
+
+  // Efecto para manejar eventos de WebSocket
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("catalogUpdate", (data) => {
+      console.log("Recibida actualización de catálogo:", data);
+
+      if (data.type === "create") {
+        setProducts((prevProducts) => [...prevProducts, data.product]);
+      } else if (data.type === "update") {
+        setProducts((prevProducts) =>
+          prevProducts.map((p) =>
+            p._id === data.product._id ? data.product : p
+          )
+        );
+      } else if (data.type === "delete") {
+        setProducts((prevProducts) =>
+          prevProducts.filter((p) => p._id !== data.productId)
+        );
+      }
+    });
+
+    return () => {
+      socket.off("catalogUpdate");
+    };
+  }, [socket]);
 
   if (!isOpen) return null;
 

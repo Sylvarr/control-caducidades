@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
+const http = require("http");
+const { Server } = require("socket.io");
 
 // Cargar variables de entorno
 require("dotenv").config({ path: path.join(__dirname, ".env") });
@@ -25,6 +27,21 @@ const statusRoutes = require("./routes/statusRoutes");
 const authRoutes = require("./routes/authRoutes");
 
 const app = express();
+const server = http.createServer(app);
+
+// Configuración de Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin:
+      process.env.NODE_ENV === "production"
+        ? ["https://tudominio.com"]
+        : ["http://localhost:3000", "http://localhost:5173"],
+    methods: ["GET", "POST"],
+  },
+});
+
+// Hacer io accesible globalmente
+global.io = io;
 
 // Configuración de CORS
 const corsOptions = {
@@ -89,6 +106,25 @@ app.use((req, res) => {
   res.status(404).json({ error: "Ruta no encontrada" });
 });
 
+// Configuración de WebSocket
+io.on("connection", (socket) => {
+  console.log("Cliente conectado");
+
+  socket.on("productStatusUpdate", (data) => {
+    console.log("Actualización de estado recibida:", data);
+    io.emit("productStatusUpdate", data);
+  });
+
+  socket.on("catalogUpdate", (data) => {
+    console.log("Actualización de catálogo recibida:", data);
+    io.emit("catalogUpdate", data);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Cliente desconectado");
+  });
+});
+
 // Conexión a MongoDB con retry
 const connectWithRetry = async () => {
   const maxRetries = 5;
@@ -124,7 +160,7 @@ connectWithRetry();
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
   console.log("Variables de entorno cargadas:", {
     NODE_ENV: process.env.NODE_ENV,
