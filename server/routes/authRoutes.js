@@ -7,6 +7,11 @@ const {
   isSupervisor,
 } = require("../middleware/auth");
 
+// Health check endpoint (debe estar antes del middleware de autenticación)
+router.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 // Rutas públicas
 router.post("/login", loginLimiter, authController.login);
 
@@ -22,10 +27,5 @@ router.get("/users", isSupervisor, authController.getAllUsers);
 router.post("/users", isSupervisor, authController.createUser);
 router.put("/users/:id", isSupervisor, authController.updateUser);
 router.delete("/users/:id", isSupervisor, authController.deleteUser);
-
-// Health check endpoint
-router.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
-});
 
 module.exports = router;
