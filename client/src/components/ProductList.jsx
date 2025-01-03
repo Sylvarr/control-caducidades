@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useContext } from "react";
+import { useNavigate } from "react-router-dom";
+import { AuthContext } from "../App";
 import {
   Search,
   RefreshCw,
@@ -9,6 +11,7 @@ import {
   Clock,
   X,
   ChevronRight,
+  LogOut,
 } from "lucide-react";
 import {
   getAllProductStatus,
@@ -130,6 +133,26 @@ ToastContainer.propTypes = {
 };
 
 const ProductList = () => {
+  const navigate = useNavigate();
+  const {
+    user: authUser,
+    setIsAuthenticated,
+    setUser,
+  } = useContext(AuthContext);
+
+  const handleLogout = () => {
+    // Limpiar token
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+
+    // Limpiar estado de autenticación
+    setIsAuthenticated(false);
+    setUser(null);
+
+    // Redirigir al login
+    navigate("/login");
+  };
+
   // Estados
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -187,7 +210,7 @@ const ProductList = () => {
   // Función para filtrar productos
   const filterProducts = useCallback((products, searchTerm) => {
     if (!searchTerm) {
-      const { "sin-clasificar": _, ...rest } = products;
+      const { "sin-clasificar": ignored, ...rest } = products; // eslint-disable-line no-unused-vars
       return rest;
     }
 
@@ -209,6 +232,31 @@ const ProductList = () => {
   // Efecto para cargar productos
   useEffect(() => {
     loadAllProducts();
+  }, []);
+
+  // Efecto para cargar usuario
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await fetch("http://localhost:5000/api/auth/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error("Error al cargar usuario:", error);
+      }
+    };
+
+    loadUser();
   }, []);
 
   // Efecto para manejar clics fuera
@@ -548,41 +596,61 @@ const ProductList = () => {
     <div className="max-w-md mx-auto p-4 bg-[#f8f8f8] min-h-screen relative">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      <div className="flex items-center justify-center gap-3 mb-8">
-        <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] tracking-tight">
-          Lista de Caducidades
-        </h1>
-        {calculateExpiringProducts(products) > 0 && (
+      <div className="flex flex-col items-center justify-center gap-1 mb-8">
+        {/* Información del usuario y botón de logout */}
+        <div className="flex items-center gap-3 text-sm text-gray-500 font-medium mb-3">
+          <span>
+            {authUser?.username} ·{" "}
+            {authUser?.role === "supervisor"
+              ? "Supervisor"
+              : authUser?.role === "encargado"
+              ? "Encargado"
+              : "Gerente"}
+          </span>
           <button
-            onClick={() => setIsExpiringModalOpen(true)}
-            className={`
-              relative inline-flex items-center justify-center
-              min-w-[24px] h-[24px]
-              ${
-                getGroupedExpiringProducts().expired.products.length > 0
-                  ? "bg-red-600 text-white"
-                  : "bg-[#ffb81c] text-[#1a1a1a]"
-              }
-              rounded-full px-2
-              font-['Noto Sans'] font-bold text-sm
-              shadow-sm
-              transition-all duration-200
-              hover:opacity-90 hover:shadow
-              active:scale-95
-              ${
-                getGroupedExpiringProducts().expired.products.length > 0
-                  ? "animate-pulse"
-                  : ""
-              }
-            `}
-            aria-label="Ver productos próximos a caducar"
+            onClick={handleLogout}
+            className="p-1.5 rounded-full hover:bg-gray-200 transition-colors
+              flex items-center gap-1 text-gray-500 hover:text-red-600"
+            title="Cerrar sesión"
           >
-            {calculateExpiringProducts(products)}
+            <LogOut className="w-4 h-4" />
           </button>
-        )}
+        </div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] tracking-tight">
+            Lista de Caducidades
+          </h1>
+          {calculateExpiringProducts(products) > 0 && (
+            <button
+              onClick={() => setIsExpiringModalOpen(true)}
+              className={`
+                relative inline-flex items-center justify-center
+                min-w-[24px] h-[24px]
+                ${
+                  getGroupedExpiringProducts().expired.products.length > 0
+                    ? "bg-red-600 text-white"
+                    : "bg-[#ffb81c] text-[#1a1a1a]"
+                }
+                rounded-full px-2
+                font-['Noto Sans'] font-bold text-sm
+                shadow-sm
+                transition-all duration-200
+                hover:opacity-90 hover:shadow
+                active:scale-95
+                ${
+                  getGroupedExpiringProducts().expired.products.length > 0
+                    ? "animate-pulse"
+                    : ""
+                }
+              `}
+              aria-label="Ver productos próximos a caducar"
+            >
+              {calculateExpiringProducts(products)}
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Buscador */}
       <div className="flex gap-2 mb-6">
         {/* Buscador más compacto */}
         <div className="flex-1 relative search-container">
