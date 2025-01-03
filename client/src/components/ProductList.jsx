@@ -7,6 +7,8 @@ import {
   Trash2,
   Box,
   Clock,
+  X,
+  ChevronRight,
 } from "lucide-react";
 import {
   getAllProductStatus,
@@ -152,6 +154,8 @@ const ProductList = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [toasts, setToasts] = useState([]);
+  const [isExpiringModalOpen, setIsExpiringModalOpen] = useState(false);
+  const [showUnclassified, setShowUnclassified] = useState(false);
 
   // Función para añadir toasts
   const addToast = useCallback((message, type = "info") => {
@@ -386,6 +390,130 @@ const ProductList = () => {
     }
   };
 
+  // Añadir una nueva función para calcular las notificaciones
+  const calculateExpiringProducts = useCallback((products) => {
+    const today = new Date();
+    const twoWeeksFromNow = new Date();
+    twoWeeksFromNow.setDate(today.getDate() + 14);
+
+    today.setHours(0, 0, 0, 0);
+    twoWeeksFromNow.setHours(23, 59, 59, 999); // Incluir todo el día 14
+
+    let count = 0;
+    Object.values(products).forEach((productList) => {
+      productList.forEach((product) => {
+        const fechaFrente = new Date(product.fechaFrente);
+        if (fechaFrente >= today && fechaFrente <= twoWeeksFromNow) {
+          count++;
+        }
+      });
+    });
+    return count;
+  }, []);
+
+  // Añadir función auxiliar para verificar si un producto está próximo a caducar
+  const isExpiringSoon = useCallback((date) => {
+    if (!date) return false;
+    const today = new Date();
+    const twoWeeksFromNow = new Date();
+    twoWeeksFromNow.setDate(today.getDate() + 14);
+
+    today.setHours(0, 0, 0, 0);
+    twoWeeksFromNow.setHours(23, 59, 59, 999);
+
+    const productDate = new Date(date);
+    // Ahora incluimos productos que ya han caducado
+    return productDate <= twoWeeksFromNow;
+  }, []);
+
+  // Función para calcular días hasta caducidad
+  const getDaysUntilExpiry = useCallback((date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const expiryDate = new Date(date);
+    expiryDate.setHours(0, 0, 0, 0);
+    const diffTime = expiryDate.getTime() - today.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }, []);
+
+  // Función para obtener productos próximos a caducar ordenados
+  const getExpiringProducts = useCallback(() => {
+    const expiringProducts = [];
+    Object.values(products).forEach((productList) => {
+      productList.forEach((product) => {
+        const daysUntil = getDaysUntilExpiry(product.fechaFrente);
+        // Incluir productos caducados (días negativos) y productos hasta 14 días
+        if (daysUntil <= 14) {
+          expiringProducts.push({
+            ...product,
+            daysUntilExpiry: daysUntil,
+          });
+        }
+      });
+    });
+    return expiringProducts.sort(
+      (a, b) => a.daysUntilExpiry - b.daysUntilExpiry
+    );
+  }, [products, getDaysUntilExpiry]);
+
+  // Modificar la función para agrupar productos por días
+  const getGroupedExpiringProducts = useCallback(() => {
+    const products = getExpiringProducts();
+    return {
+      expired: {
+        title: "Productos Caducados",
+        color: "#991b1b",
+        products: products.filter((p) => p.daysUntilExpiry <= 0),
+      },
+      urgent: {
+        title: "Caduca en menos de 7 días",
+        color: "#dc2626",
+        products: products.filter(
+          (p) => p.daysUntilExpiry > 0 && p.daysUntilExpiry < 7
+        ),
+      },
+      warning: {
+        title: "Caduca en 7-10 días",
+        color: "#f97316",
+        products: products.filter(
+          (p) => p.daysUntilExpiry >= 7 && p.daysUntilExpiry <= 10
+        ),
+      },
+      notice: {
+        title: "Caduca en 11-14 días",
+        color: "#ffb81c",
+        products: products.filter(
+          (p) => p.daysUntilExpiry >= 11 && p.daysUntilExpiry <= 14
+        ),
+      },
+    };
+  }, [getExpiringProducts]);
+
+  // Añadir función para manejar la navegación a un producto
+  const navigateToProduct = useCallback((product) => {
+    setIsExpiringModalOpen(false);
+
+    // Pequeño delay para permitir que el modal se cierre suavemente
+    setTimeout(() => {
+      setSelectedProduct(product);
+      setSearchTerm(product.producto.nombre); // Añadir búsqueda automática
+
+      // Encontrar y scrollear al producto
+      setTimeout(() => {
+        const productElement = document.querySelector(
+          `[data-product-id="${product.producto._id}"]`
+        );
+        if (productElement) {
+          productElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 100); // Pequeño delay para asegurar que la búsqueda ha actualizado la lista
+    }, 300);
+  }, []);
+
   // Renderizado condicional para estados de carga y error
   if (loading) {
     return (
@@ -420,26 +548,161 @@ const ProductList = () => {
     <div className="max-w-md mx-auto p-4 bg-[#f8f8f8] min-h-screen relative">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
-      <h1 className="text-2xl font-bold text-[#1d5030] mb-6 font-['Noto Sans'] tracking-tight text-center">
-        Lista de Caducidades
-      </h1>
+      <div className="flex items-center justify-center gap-3 mb-8">
+        <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] tracking-tight">
+          Lista de Caducidades
+        </h1>
+        {calculateExpiringProducts(products) > 0 && (
+          <button
+            onClick={() => setIsExpiringModalOpen(true)}
+            className={`
+              relative inline-flex items-center justify-center
+              min-w-[24px] h-[24px]
+              ${
+                getGroupedExpiringProducts().expired.products.length > 0
+                  ? "bg-red-600 text-white"
+                  : "bg-[#ffb81c] text-[#1a1a1a]"
+              }
+              rounded-full px-2
+              font-['Noto Sans'] font-bold text-sm
+              shadow-sm
+              transition-all duration-200
+              hover:opacity-90 hover:shadow
+              active:scale-95
+              ${
+                getGroupedExpiringProducts().expired.products.length > 0
+                  ? "animate-pulse"
+                  : ""
+              }
+            `}
+            aria-label="Ver productos próximos a caducar"
+          >
+            {calculateExpiringProducts(products)}
+          </button>
+        )}
+      </div>
 
       {/* Buscador */}
-      <div className="sticky top-0 bg-white shadow-sm rounded-lg mb-4 search-container border border-[#ffb81c]/20">
-        <div className="relative">
+      <div className="flex gap-2 mb-6">
+        {/* Buscador más compacto */}
+        <div className="flex-1 relative search-container">
           <input
             type="text"
             placeholder="Buscar producto..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setIsFocused(true)}
-            className="w-full p-3 pl-10 rounded-lg border-0 
+            className="w-full h-10 pl-9 pr-3 rounded-lg border-0 
               focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50
-              font-['Noto Sans'] font-semibold placeholder:text-gray-400"
+              font-['Noto Sans'] text-sm font-medium placeholder:text-gray-400
+              bg-white shadow-sm"
           />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#1d5030] w-5 h-5" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#1d5030] w-4 h-4" />
         </div>
+
+        {/* Botón para productos sin clasificar */}
+        <button
+          onClick={() => setShowUnclassified(!showUnclassified)}
+          className={`
+            h-10 px-3 rounded-lg
+            font-['Noto Sans'] text-sm font-medium
+            transition-colors duration-200
+            flex items-center gap-2
+            ${
+              showUnclassified
+                ? "bg-[#1d5030] text-white hover:bg-[#1d5030]/90"
+                : "bg-white text-[#1d5030] hover:bg-gray-50"
+            }
+            shadow-sm
+          `}
+        >
+          Sin Clasificar
+          <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
+            {products["sin-clasificar"].length}
+          </span>
+        </button>
       </div>
+
+      {/* Lista de productos sin clasificar */}
+      {showUnclassified && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center pt-20"
+          onClick={(e) => {
+            // Solo cerrar si se hace clic en el fondo oscuro
+            if (e.target === e.currentTarget) {
+              setShowUnclassified(false);
+            }
+          }}
+        >
+          {/* Fondo oscuro clickeable */}
+          <div
+            className="fixed inset-0 bg-black/50 transition-opacity"
+            onClick={() => setShowUnclassified(false)}
+          />
+
+          {/* Contenido del modal */}
+          <div
+            className="
+            relative w-full max-w-md mx-4
+            bg-white rounded-lg
+            shadow-xl
+            max-h-[70vh] overflow-hidden
+            z-10
+          "
+          >
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+              <div className="px-4 py-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[#1d5030]">
+                  Productos Sin Clasificar
+                  <span className="ml-2 text-sm font-medium text-gray-500">
+                    ({products["sin-clasificar"].length})
+                  </span>
+                </h2>
+                <button
+                  onClick={() => setShowUnclassified(false)}
+                  className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto p-2">
+              <div className="space-y-2">
+                {products["sin-clasificar"].map((product) => {
+                  const isSelected =
+                    selectedProduct?.producto?._id === product.producto?._id;
+                  return (
+                    <button
+                      key={product.producto?._id}
+                      data-product-id={product.producto?._id}
+                      onClick={() => {
+                        handleProductClick(product);
+                        setShowUnclassified(false);
+                      }}
+                      className={`
+                        w-full text-left 
+                        bg-white hover:bg-gray-50
+                        rounded-lg
+                        shadow-sm hover:shadow
+                        transition-all duration-200
+                        ${isSelected ? "ring-1 ring-[#1d5030]/30" : ""}
+                        active:scale-[0.995]
+                        p-4 product-card
+                      `}
+                    >
+                      <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block">
+                        {product.producto?.nombre}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="h-4" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Lista de productos */}
       <div className="product-list-container">
@@ -473,6 +736,7 @@ const ProductList = () => {
                     return (
                       <button
                         key={product.producto?._id}
+                        data-product-id={product.producto?._id}
                         onClick={() => handleProductClick(product)}
                         className={`
                           w-full text-left 
@@ -485,9 +749,23 @@ const ProductList = () => {
                           p-4 product-card
                         `}
                       >
-                        <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block mb-1">
-                          {product.producto?.nombre}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base flex-1">
+                            {product.producto?.nombre}
+                          </span>
+                          {isExpiringSoon(product.fechaFrente) && (
+                            <div
+                              className="
+                              w-2 h-2 
+                              rounded-full 
+                              bg-[#ffb81c]
+                              shadow-[0_0_6px_rgba(255,184,28,0.5)]
+                              animate-pulse
+                              transition-opacity duration-300
+                            "
+                            />
+                          )}
+                        </div>
 
                         {/* Contenido expandible */}
                         <div
@@ -566,21 +844,20 @@ const ProductList = () => {
                                 <Edit3 className="w-3.5 h-3.5" />
                                 Actualizar Estado
                               </button>
-                              {product.estado &&
-                                product.estado !== "sin-clasificar" && (
-                                  <button
-                                    onClick={(e) =>
-                                      handleDeleteClick(product, e)
-                                    }
-                                    className="min-w-[48px] h-[40px] flex items-center justify-center
-                                      text-gray-400 rounded-md
-                                      hover:text-red-500 hover:bg-red-50
-                                      transition-colors duration-200
-                                      active:bg-red-100"
-                                  >
-                                    <Trash2 className="w-5 h-5" />
-                                  </button>
-                                )}
+                              {(product.estado !== "sin-clasificar" ||
+                                product.fechaFrente ||
+                                product.fechaAlmacen) && (
+                                <button
+                                  onClick={(e) => handleDeleteClick(product, e)}
+                                  className="min-w-[48px] h-[40px] flex items-center justify-center
+                                    text-gray-400 rounded-md
+                                    hover:text-red-500 hover:bg-red-50
+                                    transition-colors duration-200
+                                    active:bg-red-100"
+                                >
+                                  <Trash2 className="w-5 h-5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -707,6 +984,167 @@ const ProductList = () => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Añadir el modal de próximas caducidades */}
+      {isExpiringModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            // Solo cerrar si el clic fue en el fondo oscuro
+            if (e.target === e.currentTarget) {
+              setIsExpiringModalOpen(false);
+            }
+          }}
+        >
+          {/* Fondo oscuro clickeable */}
+          <div
+            className="fixed inset-0 bg-black/50 transition-opacity"
+            onClick={() => setIsExpiringModalOpen(false)}
+          />
+
+          {/* Contenido del modal */}
+          <div
+            className="
+              relative w-full max-w-md mx-auto
+              bg-white rounded-2xl
+              min-h-[320px] max-h-[70vh]
+              overflow-hidden
+              transform transition-all duration-300
+              animate-slide-down
+              shadow-xl
+              z-10
+            "
+          >
+            {/* Header */}
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+              <div className="px-4 py-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-[#1d5030]">
+                  Próximas Caducidades
+                </h2>
+                <button
+                  onClick={() => setIsExpiringModalOpen(false)}
+                  className="
+                    p-2 rounded-full
+                    hover:bg-gray-100
+                    active:bg-gray-200
+                    transition-colors
+                  "
+                >
+                  <X className="w-6 h-6 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Lista de productos agrupada */}
+            <div className="overflow-y-auto">
+              {Object.entries(getGroupedExpiringProducts()).map(
+                ([key, { title, color, products }]) =>
+                  products.length > 0 && (
+                    <div key={key} className="mb-6 last:mb-0">
+                      {/* Header de sección */}
+                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                          {title}
+                        </h3>
+                      </div>
+
+                      {/* Lista de productos */}
+                      <div className="divide-y divide-gray-100">
+                        {products
+                          .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
+                          .map((product) => (
+                            <button
+                              key={product.producto._id}
+                              onClick={() => navigateToProduct(product)}
+                              className={`
+                                w-full text-left 
+                                hover:bg-gray-50 active:bg-gray-100 
+                                transition-colors duration-200
+                                flex items-start gap-4 group
+                                p-4
+                                ${key === "expired" ? "bg-red-50" : ""} 
+                              `}
+                            >
+                              {/* Barra indicadora de urgencia */}
+                              <div
+                                className={`
+                                  w-1.5 self-stretch rounded-full
+                                  ${key === "expired" ? "animate-pulse" : ""}
+                                `}
+                                style={{ backgroundColor: color }}
+                              />
+
+                              {/* Información del producto */}
+                              <div className="flex-1 min-w-0">
+                                {/* Nombre y días */}
+                                <div className="flex items-start justify-between gap-3 mb-1">
+                                  <h4
+                                    className={`
+                                    font-semibold truncate group-hover:text-[#1d5030] 
+                                    transition-colors
+                                    ${
+                                      key === "expired"
+                                        ? "text-red-700"
+                                        : "text-[#2d3748]"
+                                    }
+                                  `}
+                                  >
+                                    {product.producto.nombre}
+                                  </h4>
+                                  <span
+                                    className="text-sm font-medium whitespace-nowrap"
+                                    style={{ color }}
+                                  >
+                                    {product.daysUntilExpiry < 0
+                                      ? `Caducado hace ${Math.abs(
+                                          product.daysUntilExpiry
+                                        )} ${
+                                          Math.abs(product.daysUntilExpiry) ===
+                                          1
+                                            ? "día"
+                                            : "días"
+                                        }`
+                                      : `${product.daysUntilExpiry} ${
+                                          product.daysUntilExpiry === 1
+                                            ? "día"
+                                            : "días"
+                                        }`}
+                                  </span>
+                                </div>
+
+                                {/* Fecha de caducidad */}
+                                <p
+                                  className={`
+                                  text-sm font-medium
+                                  ${
+                                    key === "expired"
+                                      ? "text-red-600"
+                                      : "text-[#1d5030]"
+                                  }
+                                `}
+                                >
+                                  {formatDate(product.fechaFrente)}
+                                </p>
+                              </div>
+
+                              {/* Indicador de acción */}
+                              <div
+                                className="text-gray-400 group-hover:text-[#1d5030] 
+                                transition-colors self-center"
+                              >
+                                <ChevronRight className="w-5 h-5" />
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )
+              )}
+              <div className="h-8" /> {/* Padding inferior aumentado */}
             </div>
           </div>
         </div>
