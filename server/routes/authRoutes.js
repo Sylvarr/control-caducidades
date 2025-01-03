@@ -23,4 +23,9 @@ router.post("/users", isSupervisor, authController.createUser);
 router.put("/users/:id", isSupervisor, authController.updateUser);
 router.delete("/users/:id", isSupervisor, authController.deleteUser);
 
+// Health check endpoint
+router.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok" });
+});
+
 module.exports = router;

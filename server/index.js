@@ -6,10 +6,20 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 // Cargar variables de entorno
-require("dotenv").config({ path: path.join(__dirname, ".env") });
+require("dotenv").config({
+  path: path.join(
+    __dirname,
+    process.env.NODE_ENV === "production" ? ".env.production" : ".env"
+  ),
+});
 
 // Verificar variables de entorno críticas
-const requiredEnvVars = ["JWT_SECRET", "MONGODB_URI", "NODE_ENV"];
+const requiredEnvVars = [
+  "JWT_SECRET",
+  "MONGODB_URI",
+  "NODE_ENV",
+  "CORS_ORIGIN",
+];
 const missingEnvVars = requiredEnvVars.filter(
   (varName) => !process.env[varName]
 );
@@ -32,11 +42,9 @@ const server = http.createServer(app);
 // Configuración de Socket.IO
 const io = new Server(server, {
   cors: {
-    origin:
-      process.env.NODE_ENV === "production"
-        ? ["https://tudominio.com"]
-        : ["http://localhost:3000", "http://localhost:5173"],
+    origin: process.env.CORS_ORIGIN,
     methods: ["GET", "POST"],
+    credentials: true,
   },
 });
 
@@ -45,10 +53,7 @@ global.io = io;
 
 // Configuración de CORS
 const corsOptions = {
-  origin:
-    process.env.NODE_ENV === "production"
-      ? ["https://tudominio.com"] // Reemplazar con tu dominio de producción
-      : ["http://localhost:3000", "http://localhost:5173"],
+  origin: process.env.CORS_ORIGIN,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
@@ -71,10 +76,24 @@ if (process.env.NODE_ENV === "development") {
   });
 }
 
-// Rutas
+// Servir archivos estáticos en producción
+if (process.env.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../client/dist")));
+}
+
+// Rutas API
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/auth", authRoutes);
+
+// En producción, todas las rutas no-API sirven el index.html
+if (process.env.NODE_ENV === "production") {
+  app.get("*", (req, res) => {
+    if (!req.path.startsWith("/api")) {
+      res.sendFile(path.join(__dirname, "../client/dist/index.html"));
+    }
+  });
+}
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
@@ -166,5 +185,6 @@ server.listen(PORT, () => {
     NODE_ENV: process.env.NODE_ENV,
     JWT_SECRET: process.env.JWT_SECRET ? "Configurado" : "No configurado",
     MONGODB_URI: process.env.MONGODB_URI ? "Configurado" : "No configurado",
+    CORS_ORIGIN: process.env.CORS_ORIGIN,
   });
 });
