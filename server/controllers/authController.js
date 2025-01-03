@@ -130,18 +130,32 @@ exports.getAllUsers = async (req, res) => {
 // Crear usuario (solo supervisor)
 exports.createUser = async (req, res) => {
   try {
-    const { username, password, role } = req.body;
+    const { username, password, role, restaurante } = req.body;
+    console.log("Datos recibidos:", { username, role, restaurante });
 
     // Validar entrada
-    if (!username || !password || !role) {
+    if (!username || !password || !role || !restaurante) {
+      console.log("Campos faltantes:", {
+        username: !username,
+        password: !password,
+        role: !role,
+        restaurante: !restaurante,
+      });
       return res.status(400).json({
         error: "Todos los campos son requeridos",
+        details: {
+          username: !username ? "Falta el nombre de usuario" : null,
+          password: !password ? "Falta la contraseña" : null,
+          role: !role ? "Falta el rol" : null,
+          restaurante: !restaurante ? "Falta el restaurante" : null,
+        },
       });
     }
 
     // Verificar si el usuario ya existe
     const existingUser = await User.findOne({ username });
     if (existingUser) {
+      console.log("Usuario existente encontrado:", existingUser.username);
       return res.status(400).json({
         error: "El usuario ya existe",
       });
@@ -152,22 +166,37 @@ exports.createUser = async (req, res) => {
       username,
       password,
       role,
+      restaurante,
     });
 
-    await user.save();
+    try {
+      await user.save();
+      console.log("Usuario creado exitosamente:", user);
 
-    res.status(201).json({
-      message: "Usuario creado correctamente",
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-      },
-    });
+      res.status(201).json({
+        message: "Usuario creado correctamente",
+        user: {
+          id: user._id,
+          username: user.username,
+          role: user.role,
+          restaurante: user.restaurante,
+        },
+      });
+    } catch (saveError) {
+      console.error("Error al guardar usuario:", saveError);
+      if (saveError.name === "ValidationError") {
+        return res.status(400).json({
+          error: "Error de validación",
+          details: Object.values(saveError.errors).map((err) => err.message),
+        });
+      }
+      throw saveError;
+    }
   } catch (error) {
-    console.error("Error al crear usuario:", error);
+    console.error("Error detallado al crear usuario:", error);
     res.status(500).json({
       error: "Error al crear usuario",
+      details: error.message,
     });
   }
 };

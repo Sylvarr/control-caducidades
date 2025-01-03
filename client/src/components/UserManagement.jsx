@@ -20,6 +20,7 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
     username: "",
     password: "",
     role: "encargado",
+    restaurante: "Mercadona Alcalá",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -103,7 +104,7 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
       setIsSubmitting(true);
       console.log("Enviando datos:", formData);
 
-      const response = await fetch("http://localhost:5000/api/auth/register", {
+      const response = await fetch("http://localhost:5000/api/auth/users", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -111,22 +112,32 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
             localStorage.getItem("token") || sessionStorage.getItem("token")
           }`,
         },
-        body: JSON.stringify({
-          ...formData,
-          restaurante: currentUser.restaurante,
-        }),
+        body: JSON.stringify(formData),
       });
 
       const data = await response.json();
       console.log("Respuesta del servidor:", data);
 
       if (!response.ok) {
-        throw new Error(data.message || "Error al crear usuario");
+        throw new Error(
+          data.details
+            ? `${data.error}: ${
+                typeof data.details === "string"
+                  ? data.details
+                  : Object.values(data.details).filter(Boolean).join(", ")
+              }`
+            : data.error || "Error al crear usuario"
+        );
       }
 
       await loadUsers();
       setShowCreateForm(false);
-      setFormData({ username: "", password: "", role: "encargado" });
+      setFormData({
+        username: "",
+        password: "",
+        role: "encargado",
+        restaurante: "Mercadona Alcalá",
+      });
       setError(null);
     } catch (err) {
       console.error("Error completo:", err);
@@ -182,6 +193,7 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
             username: "",
             password: "",
             role: "encargado",
+            restaurante: "Mercadona Alcalá",
           });
           setFormErrors({});
           onClose();
@@ -208,6 +220,7 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
                 username: "",
                 password: "",
                 role: "encargado",
+                restaurante: "Mercadona Alcalá",
               });
               setFormErrors({});
               onClose();
@@ -320,6 +333,7 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
                       username: "",
                       password: "",
                       role: "encargado",
+                      restaurante: "Mercadona Alcalá",
                     });
                     setFormErrors({});
                     setError(null);
