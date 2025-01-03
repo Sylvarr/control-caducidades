@@ -1,7 +1,27 @@
+// Función auxiliar para obtener el token
+const getAuthToken = () => {
+  return localStorage.getItem("token") || sessionStorage.getItem("token");
+};
+
+// Función auxiliar para obtener los headers comunes
+const getHeaders = (contentType = false) => {
+  const headers = {
+    Authorization: `Bearer ${getAuthToken()}`,
+  };
+
+  if (contentType) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  return headers;
+};
+
 // Obtener todos los estados de productos
 export const getAllProductStatus = async () => {
   try {
-    const response = await fetch("http://localhost:5000/api/status");
+    const response = await fetch("http://localhost:5000/api/status", {
+      headers: getHeaders(),
+    });
     if (!response.ok) {
       throw new Error("Error al obtener los estados");
     }
@@ -21,9 +41,7 @@ export const updateProductStatus = async (productId, data) => {
       `http://localhost:5000/api/status/${productId}`,
       {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getHeaders(true),
         body: JSON.stringify(data),
       }
     );
@@ -40,16 +58,30 @@ export const updateProductStatus = async (productId, data) => {
   }
 };
 
-// Añadir esta nueva función
+// Obtener todos los productos del catálogo
 export const getAllCatalogProducts = async () => {
   try {
-    const response = await fetch("http://localhost:5000/api/catalog");
+    console.log("Obteniendo productos del catálogo...");
+    console.log("Token disponible:", !!getAuthToken());
+
+    const response = await fetch("http://localhost:5000/api/catalog", {
+      headers: getHeaders(),
+    });
+
+    console.log("Respuesta del servidor:", {
+      status: response.status,
+      statusText: response.statusText,
+      ok: response.ok,
+    });
+
     if (!response.ok) {
-      throw new Error("Error al obtener el catálogo");
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Error al obtener el catálogo");
     }
+
     return await response.json();
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error completo:", error);
     throw error;
   }
 };
@@ -60,6 +92,7 @@ export const deleteProductStatus = async (productId) => {
       `http://localhost:5000/api/status/${productId}`,
       {
         method: "DELETE",
+        headers: getHeaders(),
       }
     );
 

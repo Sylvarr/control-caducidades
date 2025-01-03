@@ -439,7 +439,16 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
 UserManagement.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
-  currentUser: PropTypes.object.isRequired,
+  currentUser: PropTypes.shape({
+    _id: PropTypes.string,
+    username: PropTypes.string,
+    role: PropTypes.string,
+    restaurante: PropTypes.string,
+  }),
+};
+
+UserManagement.defaultProps = {
+  currentUser: null,
 };
 
 export default UserManagement;

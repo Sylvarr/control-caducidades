@@ -76,10 +76,12 @@ const Login = () => {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] mb-2">
+          <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] mb-2 select-none">
             Control de Caducidades
           </h1>
-          <p className="text-gray-600">Inicia sesión para continuar</p>
+          <p className="text-gray-600 select-none">
+            Inicia sesión para continuar
+          </p>
         </div>
 
         {/* Formulario */}
@@ -88,7 +90,7 @@ const Login = () => {
           className="bg-white rounded-lg shadow-sm p-6 space-y-4"
         >
           {error && (
-            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm">
+            <div className="bg-red-50 text-red-600 px-4 py-3 rounded-md text-sm select-none">
               {error}
             </div>
           )}
@@ -96,7 +98,7 @@ const Login = () => {
           <div>
             <label
               htmlFor="username"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 mb-1 select-none"
             >
               Usuario
             </label>
@@ -116,7 +118,7 @@ const Login = () => {
           <div>
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 mb-1 select-none"
             >
               Contraseña
             </label>
@@ -157,7 +159,7 @@ const Login = () => {
             />
             <label
               htmlFor="rememberMe"
-              className="ml-2 block text-sm text-gray-700"
+              className="ml-2 block text-sm text-gray-700 select-none"
             >
               Mantener sesión iniciada
             </label>
@@ -169,14 +171,14 @@ const Login = () => {
             className="w-full bg-[#1d5030] text-white py-2 px-4 rounded-md
               hover:bg-[#1d5030]/90 transition-colors duration-200
               disabled:opacity-50 disabled:cursor-not-allowed
-              font-medium"
+              font-medium select-none"
           >
             {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
           </button>
         </form>
 
         {/* Footer */}
-        <p className="text-center mt-4 text-sm text-gray-600">
+        <p className="text-center mt-4 text-sm text-gray-600 select-none">
           Si no tienes acceso, contacta con tu supervisor
         </p>
       </div>

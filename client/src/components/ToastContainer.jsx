@@ -1,4 +1,6 @@
 import { X } from "lucide-react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types";
 
 const getToastStyles = (type) => {
   switch (type) {
@@ -9,56 +11,102 @@ const getToastStyles = (type) => {
       };
     case "error":
       return {
-        container: "bg-white border-2 border-red-500 text-red-500",
-        icon: "text-red-500",
+        container: "bg-[#1d5030] text-white",
+        icon: "text-white",
       };
     case "warning":
       return {
-        container: "bg-white border-2 border-[#ffb81c] text-[#ffb81c]",
-        icon: "text-[#ffb81c]",
+        container: "bg-[#1d5030] text-white",
+        icon: "text-white",
       };
     default:
       return {
-        container: "bg-white border-2 border-[#1d5030] text-[#1d5030]",
-        icon: "text-[#1d5030]",
+        container: "bg-[#1d5030] text-white",
+        icon: "text-white",
       };
   }
 };
 
-const ToastContainer = ({ toasts, removeToast }) => {
+const Toast = ({ toast, onRemove }) => {
+  const [isExiting, setIsExiting] = useState(false);
+  const styles = getToastStyles(toast.type);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsExiting(true);
+      setTimeout(() => {
+        onRemove(toast.id);
+      }, 150); // Duración de la animación de salida
+    }, 3000); // Duración del toast
+
+    return () => clearTimeout(timer);
+  }, [toast.id, onRemove]);
+
+  const handleManualClose = () => {
+    setIsExiting(true);
+    setTimeout(() => {
+      onRemove(toast.id);
+    }, 150);
+  };
+
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-      {toasts.map((toast) => {
-        const styles = getToastStyles(toast.type);
-        return (
-          <div
-            key={toast.id}
-            className={`
-              ${styles.container}
-              px-4 py-3 rounded-lg shadow-lg
-              flex items-center justify-between
-              min-w-[300px] max-w-md
-              animate-slide-in
-              font-['Noto Sans'] font-medium
-            `}
-          >
-            <span>{toast.message}</span>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className={`
-                ${styles.icon}
-                p-1 rounded-full
-                hover:bg-black/10
-                transition-colors duration-200
-              `}
-            >
-              <X size={16} />
-            </button>
-          </div>
-        );
-      })}
+    <div
+      className={`
+        ${styles.container}
+        px-3 py-2.5 rounded-lg shadow-lg
+        flex items-center justify-between
+        w-[calc(100vw-32px)] sm:w-auto sm:min-w-[300px] sm:max-w-md
+        ${isExiting ? "animate-slide-out" : "animate-slide-in"}
+        font-['Noto Sans'] text-sm font-medium
+        transform transition-all duration-200
+      `}
+    >
+      <span className="mr-2">{toast.message}</span>
+      <button
+        onClick={handleManualClose}
+        className={`
+          ${styles.icon}
+          p-1 rounded-full shrink-0
+          hover:bg-black/10
+          transition-colors duration-200
+        `}
+      >
+        <X size={14} />
+      </button>
     </div>
   );
+};
+
+Toast.propTypes = {
+  toast: PropTypes.shape({
+    id: PropTypes.number.isRequired,
+    message: PropTypes.string.isRequired,
+    type: PropTypes.oneOf(["success", "error", "warning", "info"]).isRequired,
+  }).isRequired,
+  onRemove: PropTypes.func.isRequired,
+};
+
+const ToastContainer = ({ toasts, removeToast }) => {
+  return (
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+      <div className="flex flex-col gap-2 items-end pointer-events-auto">
+        {toasts.map((toast) => (
+          <Toast key={toast.id} toast={toast} onRemove={removeToast} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+ToastContainer.propTypes = {
+  toasts: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.number.isRequired,
+      message: PropTypes.string.isRequired,
+      type: PropTypes.oneOf(["success", "error", "warning", "info"]).isRequired,
+    })
+  ).isRequired,
+  removeToast: PropTypes.func.isRequired,
 };
 
 export default ToastContainer;

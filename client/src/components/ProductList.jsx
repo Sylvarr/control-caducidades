@@ -12,6 +12,8 @@ import {
   X,
   ChevronRight,
   LogOut,
+  Users,
+  Package,
 } from "lucide-react";
 import {
   getAllProductStatus,
@@ -21,6 +23,8 @@ import {
 } from "../services/api";
 import ToastContainer from "./ToastContainer";
 import PropTypes from "prop-types";
+import UserManagement from "./UserManagement";
+import CatalogManagement from "./CatalogManagement";
 
 // Constantes y funciones de utilidad
 const CATEGORY_TITLES = {
@@ -32,14 +36,20 @@ const CATEGORY_TITLES = {
 };
 
 const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.getFullYear() !== new Date().getFullYear()
-    ? `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}/${date.getFullYear()}`
-    : `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
-        .toString()
-        .padStart(2, "0")}`;
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return "Fecha inválida";
+
+    return date.getFullYear() !== new Date().getFullYear()
+      ? `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}/${date.getFullYear()}`
+      : `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}`;
+  } catch {
+    return "Fecha inválida";
+  }
 };
 
 // Componente ProductSkeleton
@@ -121,17 +131,6 @@ CustomCheckbox.propTypes = {
   onChange: PropTypes.func.isRequired,
 };
 
-ToastContainer.propTypes = {
-  toasts: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.number.isRequired,
-      message: PropTypes.string.isRequired,
-      type: PropTypes.oneOf(["info", "success", "error"]).isRequired,
-    })
-  ).isRequired,
-  removeToast: PropTypes.func.isRequired,
-};
-
 const ProductList = () => {
   const navigate = useNavigate();
   const {
@@ -179,16 +178,17 @@ const ProductList = () => {
   const [toasts, setToasts] = useState([]);
   const [isExpiringModalOpen, setIsExpiringModalOpen] = useState(false);
   const [showUnclassified, setShowUnclassified] = useState(false);
+  const [isUserManagementOpen, setIsUserManagementOpen] = useState(false);
+  const [showCatalogManagement, setShowCatalogManagement] = useState(false);
+  const [lastUpdatedProductId, setLastUpdatedProductId] = useState(null);
+  const [isClosingUnclassified, setIsClosingUnclassified] = useState(false);
+  const [isClosingUpdateModal, setIsClosingUpdateModal] = useState(false);
+  const [isClosingExpiringModal, setIsClosingExpiringModal] = useState(false);
 
-  // Función para añadir toasts
+  // Función mejorada para añadir toasts
   const addToast = useCallback((message, type = "info") => {
     const id = Date.now();
     setToasts((currentToasts) => [...currentToasts, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((currentToasts) =>
-        currentToasts.filter((toast) => toast.id !== id)
-      );
-    }, 3000);
   }, []);
 
   // Función para remover toasts
@@ -198,35 +198,50 @@ const ProductList = () => {
     );
   }, []);
 
-  // Función para validar fechas
+  // Función mejorada para validar fechas
   const isDateValid = useCallback((dateString) => {
     if (!dateString) return false;
-    const selectedDate = new Date(dateString);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return selectedDate >= today;
+    try {
+      const selectedDate = new Date(dateString);
+      if (isNaN(selectedDate.getTime())) return false;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return selectedDate >= today;
+    } catch {
+      return false;
+    }
   }, []);
 
-  // Función para filtrar productos
+  // Función optimizada para filtrar productos
   const filterProducts = useCallback((products, searchTerm) => {
     if (!searchTerm) {
-      const { "sin-clasificar": ignored, ...rest } = products; // eslint-disable-line no-unused-vars
+      // eslint-disable-next-line no-unused-vars
+      const { "sin-clasificar": _unused, ...rest } = products;
       return rest;
     }
 
-    const searchTermLower = searchTerm.toLowerCase();
-    const filteredProducts = {};
+    const searchTermLower = searchTerm.toLowerCase().trim();
+    if (!searchTermLower) {
+      // eslint-disable-next-line no-unused-vars
+      const { "sin-clasificar": _unused, ...rest } = products;
+      return rest;
+    }
 
-    Object.entries(products).forEach(([category, productList]) => {
-      const filtered = productList.filter((product) =>
-        product.producto?.nombre?.toLowerCase().includes(searchTermLower)
-      );
-      if (filtered.length > 0 || category !== "sin-clasificar") {
-        filteredProducts[category] = filtered;
-      }
-    });
+    return Object.entries(products).reduce(
+      (filteredProducts, [category, productList]) => {
+        const filtered = productList.filter((product) =>
+          product.producto?.nombre?.toLowerCase().includes(searchTermLower)
+        );
 
-    return filteredProducts;
+        if (filtered.length > 0 || category !== "sin-clasificar") {
+          filteredProducts[category] = filtered;
+        }
+
+        return filteredProducts;
+      },
+      {}
+    );
   }, []);
 
   // Efecto para cargar productos
@@ -370,23 +385,32 @@ const ProductList = () => {
       setIsUpdating(true);
 
       if (!editingProduct) {
-        addToast("No hay producto seleccionado", "error");
+        addToast("No hay producto seleccionado.", "error");
         return;
       }
 
       if (!updateForm.fechaFrente) {
-        addToast("La fecha de frente es obligatoria", "error");
+        addToast("La fecha de frente es obligatoria.", "error");
         return;
       }
 
       if (!isDateValid(updateForm.fechaFrente)) {
-        addToast("La fecha de frente no puede ser anterior a hoy", "error");
+        addToast("La fecha de frente no puede ser anterior a hoy.", "error");
         return;
       }
 
       if (!updateForm.noHayEnAlmacen && updateForm.fechaAlmacen) {
         if (!isDateValid(updateForm.fechaAlmacen)) {
-          addToast("La fecha de almacén no puede ser anterior a hoy", "error");
+          addToast("La fecha de almacén no puede ser anterior a hoy.", "error");
+          return;
+        }
+
+        // Nueva validación: comparar fechas
+        const fechaFrente = new Date(updateForm.fechaFrente);
+        const fechaAlmacen = new Date(updateForm.fechaAlmacen);
+
+        if (fechaFrente > fechaAlmacen) {
+          addToast("Fecha de frente incorrecta.", "error");
           return;
         }
       }
@@ -404,20 +428,40 @@ const ProductList = () => {
       const catalogProductId = editingProduct.producto?._id;
 
       if (!catalogProductId) {
-        addToast("No se pudo obtener el ID del producto", "error");
+        addToast("No se pudo obtener el ID del producto.", "error");
         return;
       }
 
       await updateProductStatus(catalogProductId, updateData);
       await loadAllProducts();
       setIsUpdateModalOpen(false);
+      setShowUnclassified(false);
       setEditingProduct(null);
       setSelectedProduct(null);
       setSearchTerm("");
+      setLastUpdatedProductId(catalogProductId);
 
-      addToast("Producto actualizado correctamente", "success");
+      // Limpiar el resaltado después de 3 segundos
+      setTimeout(() => {
+        setLastUpdatedProductId(null);
+      }, 3000);
+
+      // Scroll al producto actualizado
+      setTimeout(() => {
+        const productElement = document.querySelector(
+          `[data-product-id="${catalogProductId}"]`
+        );
+        if (productElement) {
+          productElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 100); // Pequeño delay para asegurar que el DOM se ha actualizado
+
+      addToast("Producto actualizado correctamente.", "success");
     } catch (error) {
-      addToast(`Error al actualizar: ${error.message}`, "error");
+      addToast(`Error al actualizar: ${error.message}.`, "error");
     } finally {
       setIsUpdating(false);
     }
@@ -432,9 +476,12 @@ const ProductList = () => {
       await loadAllProducts();
       setSelectedProduct(null);
       setSearchTerm("");
-      addToast("Producto desclasificado correctamente", "success");
+      addToast("Producto desclasificado correctamente.", "success");
     } catch (error) {
-      addToast(`Error al desclasificar el producto: ${error.message}`, "error");
+      addToast(
+        `Error al desclasificar el producto: ${error.message}.`,
+        "error"
+      );
     }
   };
 
@@ -562,6 +609,31 @@ const ProductList = () => {
     }, 300);
   }, []);
 
+  const handleCloseUnclassified = () => {
+    setIsClosingUnclassified(true);
+    setTimeout(() => {
+      setShowUnclassified(false);
+      setIsClosingUnclassified(false);
+    }, 150);
+  };
+
+  const handleCloseUpdateModal = () => {
+    setIsClosingUpdateModal(true);
+    setTimeout(() => {
+      setIsUpdateModalOpen(false);
+      setEditingProduct(null);
+      setIsClosingUpdateModal(false);
+    }, 150);
+  };
+
+  const handleCloseExpiringModal = () => {
+    setIsClosingExpiringModal(true);
+    setTimeout(() => {
+      setIsExpiringModalOpen(false);
+      setIsClosingExpiringModal(false);
+    }, 150);
+  };
+
   // Renderizado condicional para estados de carga y error
   if (loading) {
     return (
@@ -597,9 +669,9 @@ const ProductList = () => {
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       <div className="flex flex-col items-center justify-center gap-1 mb-8">
-        {/* Información del usuario y botón de logout */}
+        {/* Información del usuario y botones */}
         <div className="flex items-center gap-3 text-sm text-gray-500 font-medium mb-3">
-          <span>
+          <span className="select-none">
             {authUser?.username} ·{" "}
             {authUser?.role === "supervisor"
               ? "Supervisor"
@@ -607,17 +679,39 @@ const ProductList = () => {
               ? "Encargado"
               : "Gerente"}
           </span>
-          <button
-            onClick={handleLogout}
-            className="p-1.5 rounded-full hover:bg-gray-200 transition-colors
-              flex items-center gap-1 text-gray-500 hover:text-red-600"
-            title="Cerrar sesión"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {authUser?.role === "supervisor" && (
+              <>
+                <button
+                  onClick={() => setShowCatalogManagement(true)}
+                  className="p-2 text-gray-400 hover:text-[#1d5030]
+                    hover:bg-[#1d5030]/10 rounded-md transition-colors"
+                  title="Gestionar Catálogo"
+                >
+                  <Package className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setIsUserManagementOpen(true)}
+                  className="p-2 text-gray-400 hover:text-[#1d5030]
+                    hover:bg-[#1d5030]/10 rounded-md transition-colors"
+                  title="Gestionar Usuarios"
+                >
+                  <Users className="w-5 h-5" />
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-red-600
+                hover:bg-red-50 rounded-md transition-colors"
+              title="Cerrar Sesión"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] tracking-tight">
+          <h1 className="text-2xl font-bold text-[#1d5030] font-['Noto Sans'] tracking-tight select-none">
             Lista de Caducidades
           </h1>
           {calculateExpiringProducts(products) > 0 && (
@@ -633,7 +727,7 @@ const ProductList = () => {
                 }
                 rounded-full px-2
                 font-['Noto Sans'] font-bold text-sm
-                shadow-sm
+                shadow-sm select-none
                 transition-all duration-200
                 hover:opacity-90 hover:shadow
                 active:scale-95
@@ -660,12 +754,23 @@ const ProductList = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => setIsFocused(true)}
-            className="w-full h-10 pl-9 pr-3 rounded-lg border-0 
-              focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50
+            className="w-full h-10 pl-9 pr-9 rounded-lg border-0 
+              focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50 focus:border-transparent
               font-['Noto Sans'] text-sm font-medium placeholder:text-gray-400
               bg-white shadow-sm"
           />
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#1d5030] w-4 h-4" />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1
+                text-gray-400 hover:text-gray-600
+                rounded-full hover:bg-gray-100
+                transition-all duration-200"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Botón para productos sin clasificar */}
@@ -673,7 +778,7 @@ const ProductList = () => {
           onClick={() => setShowUnclassified(!showUnclassified)}
           className={`
             h-10 px-3 rounded-lg
-            font-['Noto Sans'] text-sm font-medium
+            font-['Noto Sans'] text-sm font-medium select-none
             transition-colors duration-200
             flex items-center gap-2
             ${
@@ -685,7 +790,7 @@ const ProductList = () => {
           `}
         >
           Sin Clasificar
-          <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
+          <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs select-none">
             {products["sin-clasificar"].length}
           </span>
         </button>
@@ -694,11 +799,13 @@ const ProductList = () => {
       {/* Lista de productos sin clasificar */}
       {showUnclassified && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center pt-20 animate-fade-in"
+          className={`
+          fixed inset-0 z-50 flex items-start justify-center pt-20
+          ${isClosingUnclassified ? "animate-fade-out" : "animate-fade-in"}
+          `}
           onClick={(e) => {
-            // Solo cerrar si se hace clic en el fondo oscuro
             if (e.target === e.currentTarget) {
-              setShowUnclassified(false);
+              handleCloseUnclassified();
             }
           }}
         >
@@ -710,15 +817,13 @@ const ProductList = () => {
 
           {/* Contenido del modal */}
           <div
-            className="
+            className={`
             relative w-full max-w-md mx-4
-            bg-white rounded-lg
-            shadow-xl
-            max-h-[calc(100vh-8rem)] flex flex-col
-            z-10
-            animate-slide-down
+            bg-white rounded-lg shadow-xl
+            max-h-[calc(100vh-8rem)] flex flex-col z-10
+            ${isClosingUnclassified ? "animate-slide-up" : "animate-slide-down"}
             transition-all duration-300 ease-out
-            "
+            `}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex-none sticky top-0 z-10 bg-white border-b border-gray-200">
@@ -730,7 +835,7 @@ const ProductList = () => {
                   </span>
                 </h2>
                 <button
-                  onClick={() => setShowUnclassified(false)}
+                  onClick={handleCloseUnclassified}
                   className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-all duration-200"
                 >
                   <X className="w-5 h-5 text-gray-500" />
@@ -799,6 +904,7 @@ const ProductList = () => {
                   text-[#1d5030]
                   uppercase tracking-wide
                   mb-3
+                  select-none
                 "
                 >
                   {CATEGORY_TITLES[category]}
@@ -819,14 +925,19 @@ const ProductList = () => {
                           bg-white hover:bg-gray-50
                           rounded-lg
                           shadow-sm hover:shadow
-                          transition-all duration-200
+                          transition-all duration-500
                           ${isSelected ? "ring-1 ring-[#1d5030]/30" : ""}
+                          ${
+                            lastUpdatedProductId === product.producto?._id
+                              ? "animate-highlight bg-[#1d5030]/5"
+                              : ""
+                          }
                           active:scale-[0.995]
                           p-4 product-card
                         `}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base flex-1">
+                          <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base flex-1 select-none">
                             {product.producto?.nombre}
                           </span>
                           {isExpiringSoon(product.fechaFrente) && (
@@ -861,11 +972,11 @@ const ProductList = () => {
                                 <div className="bg-[#f8f8f8] rounded-md p-3">
                                   <div
                                     className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
-                                    text-[14px] font-semibold mb-2"
+                                    text-[14px] font-semibold mb-2 select-none"
                                   >
                                     FRENTE
                                   </div>
-                                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight">
+                                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
                                     {formatDate(product.fechaFrente)}
                                   </div>
                                 </div>
@@ -874,11 +985,11 @@ const ProductList = () => {
                                 <div className="bg-[#f8f8f8] rounded-md p-3">
                                   <div
                                     className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
-                                    text-[14px] font-semibold mb-2"
+                                    text-[14px] font-semibold mb-2 select-none"
                                   >
                                     ALMACÉN
                                   </div>
-                                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight">
+                                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
                                     {formatDate(product.fechaAlmacen)}
                                   </div>
                                 </div>
@@ -889,7 +1000,7 @@ const ProductList = () => {
                                 {product.hayOtrasFechas && (
                                   <div
                                     className="inline-flex items-center px-2.5 py-1 rounded-md
-                                    bg-[#1d5030]/5 text-[#1d5030] text-sm"
+                                    bg-[#1d5030]/5 text-[#1d5030] text-sm select-none"
                                   >
                                     <Clock className="w-3.5 h-3.5 mr-1" />
                                     Hay otras fechas
@@ -898,7 +1009,7 @@ const ProductList = () => {
                                 {product.cajaUnica && (
                                   <div
                                     className="inline-flex items-center px-2.5 py-1 rounded-md
-                                    bg-[#ffb81c]/5 text-[#1d5030] text-sm"
+                                    bg-[#ffb81c]/5 text-[#1d5030] text-sm select-none"
                                   >
                                     <Box className="w-3.5 h-3.5 mr-1" />
                                     Última caja
@@ -912,7 +1023,7 @@ const ProductList = () => {
                                 className="flex-1 py-2 text-white rounded-md
                                   bg-[#1d5030] hover:bg-[#1d5030]/90
                                   transition-colors duration-200
-                                  font-medium text-sm
+                                  font-medium text-sm select-none
                                   flex items-center justify-center gap-1.5
                                   shadow-sm hover:shadow
                                   mr-2"
@@ -949,11 +1060,13 @@ const ProductList = () => {
       {/* Modal de actualización */}
       {isUpdateModalOpen && (
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50 animate-fade-in"
+          className={`
+          fixed inset-0 flex items-center justify-center p-4 z-50
+          ${isClosingUpdateModal ? "animate-fade-out" : "animate-fade-in"}
+          `}
           onClick={(e) => {
             if (e.target === e.currentTarget) {
-              setIsUpdateModalOpen(false);
-              setEditingProduct(null);
+              handleCloseUpdateModal();
             }
           }}
         >
@@ -967,14 +1080,13 @@ const ProductList = () => {
           />
 
           <div
-            className="
-            relative z-10
-            bg-white rounded-lg p-6 w-full max-w-md
-            animate-scale-in
+            className={`
+            relative z-10 bg-white rounded-lg p-6 w-full max-w-md
+            ${isClosingUpdateModal ? "animate-slide-out" : "animate-slide-in"}
             transform transition-all duration-300 ease-out
-          "
+            `}
           >
-            <h3 className="text-xl font-semibold text-[#2d3748] mb-6">
+            <h3 className="text-xl font-semibold text-[#2d3748] mb-6 select-none">
               Actualizar estado de {editingProduct?.producto?.nombre}
             </h3>
 
@@ -1047,8 +1159,7 @@ const ProductList = () => {
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   onClick={() => {
-                    setIsUpdateModalOpen(false);
-                    setEditingProduct(null);
+                    handleCloseUpdateModal();
                   }}
                   className="px-4 py-2 text-sm font-medium text-[#2d3748]
                     bg-gray-50 hover:bg-gray-100
@@ -1083,11 +1194,13 @@ const ProductList = () => {
       {/* Añadir el modal de próximas caducidades */}
       {isExpiringModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className={`
+          fixed inset-0 z-50 flex items-center justify-center p-4
+          ${isClosingExpiringModal ? "animate-fade-out" : "animate-fade-in"}
+          `}
           onClick={(e) => {
-            // Solo cerrar si el clic fue en el fondo oscuro
             if (e.target === e.currentTarget) {
-              setIsExpiringModalOpen(false);
+              handleCloseExpiringModal();
             }
           }}
         >
@@ -1099,31 +1212,27 @@ const ProductList = () => {
 
           {/* Contenido del modal */}
           <div
-            className="
-              relative w-full max-w-md mx-auto
-              bg-white rounded-2xl
-              min-h-[320px] max-h-[70vh]
-              overflow-hidden
+            className={`
+              relative w-full max-w-md mx-auto bg-white rounded-2xl
+              min-h-[320px] max-h-[70vh] overflow-hidden z-10
+              ${
+                isClosingExpiringModal
+                  ? "animate-slide-out"
+                  : "animate-slide-down"
+              }
               transform transition-all duration-300
-              animate-slide-down
               shadow-xl
-              z-10
-            "
+            `}
           >
             {/* Header */}
             <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
               <div className="px-4 py-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#1d5030]">
+                <h2 className="text-lg font-bold text-[#1d5030] select-none">
                   Próximas Caducidades
                 </h2>
                 <button
-                  onClick={() => setIsExpiringModalOpen(false)}
-                  className="
-                    p-2 rounded-full
-                    hover:bg-gray-100
-                    active:bg-gray-200
-                    transition-colors
-                  "
+                  onClick={handleCloseExpiringModal}
+                  className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
                 >
                   <X className="w-6 h-6 text-gray-500" />
                 </button>
@@ -1240,8 +1349,28 @@ const ProductList = () => {
           </div>
         </div>
       )}
+
+      {/* User Management Modal */}
+      <UserManagement
+        isOpen={isUserManagementOpen}
+        onClose={() => setIsUserManagementOpen(false)}
+        currentUser={authUser}
+      />
+
+      {/* Catalog Management Modal */}
+      <CatalogManagement
+        isOpen={showCatalogManagement}
+        onClose={() => {
+          setShowCatalogManagement(false);
+          loadAllProducts(); // Recargar productos al cerrar el modal
+        }}
+      />
     </div>
   );
+};
+
+ProductList.propTypes = {
+  // No necesita PropTypes ya que no recibe props directamente
 };
 
 export default ProductList;
