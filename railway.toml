@@ -3,7 +3,12 @@ builder = "nixpacks"
 buildCommand = "cd client && npm install && npm run build && cd ../server && npm install"
 
 [deploy]
-startCommand = "cd server && npm start"
+startCommand = "cd server && NODE_ENV=production npm start"
 healthcheckPath = "/api/auth/health"
 healthcheckTimeout = 100
-restartPolicyType = "on_failure" 
+restartPolicyType = "on_failure"
+
+[variables]
+NODE_ENV = "production"
+MONGODB_URI = "${{MongoDB.MONGO_URL}}"
+CORS_ORIGIN = "*" 
