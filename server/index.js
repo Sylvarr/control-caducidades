@@ -42,7 +42,7 @@ const server = http.createServer(app);
 // Configuración de Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN,
+    origin: "https://control-caducidades-caducidades.up.railway.app",
     methods: ["GET", "POST"],
     credentials: true,
   },
