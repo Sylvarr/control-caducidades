@@ -10,5 +10,5 @@ restartPolicyType = "on_failure"
 
 [variables]
 NODE_ENV = "production"
-MONGODB_URI = "${{MongoDB.MONGO_URL}}"
+MONGODB_URI = "${MONGO_URL}"
 CORS_ORIGIN = "*" 
