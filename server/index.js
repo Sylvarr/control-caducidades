@@ -58,19 +58,28 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   "http://127.0.0.1:5173",
-];
+  process.env.NODE_ENV === "production" ? process.env.RAILWAY_STATIC_URL : null,
+  process.env.NODE_ENV === "production"
+    ? process.env.RAILWAY_PUBLIC_DOMAIN
+    : null,
+].filter(Boolean);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Permitir solicitudes sin origin (como las herramientas de desarrollo)
-    if (!origin) {
+    // En desarrollo, permitir solicitudes sin origin
+    if (process.env.NODE_ENV !== "production" && !origin) {
+      return callback(null, true);
+    }
+
+    // En producción, permitir solicitudes del mismo origen
+    if (process.env.NODE_ENV === "production" && !origin) {
       return callback(null, true);
     }
 
     console.log("Origin recibido:", origin);
     console.log("Origins permitidos:", allowedOrigins);
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || !origin) {
       callback(null, true);
     } else {
       console.log("Origin bloqueado:", origin);
