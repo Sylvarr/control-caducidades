@@ -11,6 +11,7 @@ import {
 import PropTypes from "prop-types";
 import CreateProductModal from "./CreateProductModal";
 import { useSocket } from "../contexts/SocketContext";
+import { getAllCatalogProducts, deleteProduct } from "../services/api";
 
 const TYPE_STYLES = {
   permanente: {
@@ -50,32 +51,8 @@ const CatalogManagement = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       console.log("Intentando cargar productos...");
-
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      console.log("Token disponible:", !!token);
-
-      const response = await fetch("http://localhost:5000/api/catalog", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      console.log("Respuesta del servidor:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
-      const data = await response.json();
+      const data = await getAllCatalogProducts();
       console.log("Datos recibidos:", data);
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || data.error || "Error al cargar productos"
-        );
-      }
-
       setProducts(data);
       setError(null);
     } catch (err) {
@@ -98,53 +75,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
       setLoading(true);
       console.log("Intentando eliminar producto:", productId);
 
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      console.log("Token disponible:", !!token);
-
-      if (!token) {
-        throw new Error("No hay token de autenticación disponible");
-      }
-
-      let response;
-      try {
-        response = await fetch(
-          `http://localhost:5000/api/catalog/${productId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-      } catch (networkError) {
-        console.error("Error de red:", networkError);
-        throw new Error(
-          "Error de conexión con el servidor. Por favor, verifica que el servidor esté corriendo."
-        );
-      }
-
-      console.log("Respuesta del servidor:", {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-
-      let data;
-      try {
-        data = await response.json();
-        console.log("Datos de la respuesta:", data);
-      } catch (parseError) {
-        console.error("Error al parsear respuesta:", parseError);
-        throw new Error("Error al procesar la respuesta del servidor");
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || data.error || "Error al eliminar el producto"
-        );
-      }
-
+      await deleteProduct(productId);
       await loadProducts();
       setDeleteConfirm(null);
       setError(null);

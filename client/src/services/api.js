@@ -123,3 +123,22 @@ export const deleteProductStatus = async (productId) => {
     throw error;
   }
 };
+
+// Eliminar un producto del catálogo
+export const deleteProduct = async (productId) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/catalog/${productId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Error en deleteProduct:", error);
+    throw error;
+  }
+};
