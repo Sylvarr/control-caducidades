@@ -2,6 +2,7 @@ import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { AuthContext } from "../App";
+import config from "../config";
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
@@ -23,7 +24,7 @@ const Login = () => {
     try {
       console.log("Intentando iniciar sesión con:", credentials);
 
-      const response = await fetch("http://localhost:5000/api/auth/login", {
+      const response = await fetch(`${config.apiUrl}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
