@@ -44,6 +44,15 @@ exports.login = async (req, res) => {
     // Generar token
     console.log("Generando token JWT...");
     console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
+
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET no está definido");
+      return res.status(500).json({
+        error: "Error de configuración del servidor",
+        details: "JWT_SECRET no está configurado",
+      });
+    }
+
     const token = jwt.sign(
       {
         id: user._id,
@@ -68,10 +77,16 @@ exports.login = async (req, res) => {
   } catch (error) {
     console.error("Error detallado en login:", error);
     console.error("Stack trace:", error.stack);
+    console.error("Variables de entorno disponibles:", {
+      NODE_ENV: process.env.NODE_ENV,
+      JWT_SECRET_EXISTS: !!process.env.JWT_SECRET,
+      MONGODB_URI_EXISTS: !!process.env.MONGODB_URI,
+    });
+
     res.status(500).json({
       error: "Error interno del servidor",
-      details:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
+      details: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 };
