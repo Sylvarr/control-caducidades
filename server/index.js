@@ -195,6 +195,30 @@ const connectWithRetry = async () => {
       console.log("Conectado a MongoDB exitosamente");
       console.log("Base de datos:", mongoose.connection.name);
       console.log("Host:", mongoose.connection.host);
+
+      // Crear usuario admin si no existe
+      const User = require("./models/User");
+      const adminExists = await User.findOne({ username: "admin" });
+
+      if (!adminExists) {
+        console.log("Usuario admin no encontrado, creando...");
+        const admin = new User({
+          username: "admin",
+          password: "admin123456",
+          role: "supervisor",
+          restaurante: "Mercadona Alcalá",
+        });
+
+        try {
+          await admin.save();
+          console.log("Usuario admin creado exitosamente");
+        } catch (error) {
+          console.error("Error al crear usuario admin:", error);
+        }
+      } else {
+        console.log("Usuario admin ya existe");
+      }
+
       break;
     } catch (err) {
       retries++;
