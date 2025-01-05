@@ -39,29 +39,56 @@ const authRoutes = require("./routes/authRoutes");
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de Socket.IO
-const io = new Server(server, {
-  cors: {
-    origin: "https://control-caducidades-caducidades.up.railway.app",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
-});
+const allowedOrigins =
+  process.env.NODE_ENV === "development"
+    ? [
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+      ]
+    : process.env.CORS_ORIGIN.split(",");
 
-// Hacer io accesible globalmente
-global.io = io;
-
-// Configuración de CORS
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("Origin blocked:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,
   maxAge: 86400, // 24 horas
 };
 
-// Middleware
+// Configuración de CORS para Express
 app.use(cors(corsOptions));
+
+// Configuración de Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin:
+      process.env.NODE_ENV === "development"
+        ? [
+            "http://localhost:5173",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+          ]
+        : process.env.CORS_ORIGIN.split(","),
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"],
+  },
+  allowEIO3: true,
+  transports: ["websocket", "polling"],
+});
+
+// Hacer io accesible globalmente
+global.io = io;
+
+// Middleware
 app.use(express.json());
 
 // Middleware de logging global (solo en desarrollo)
@@ -80,6 +107,11 @@ if (process.env.NODE_ENV === "development") {
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../client/dist")));
 }
+
+app.use((req, res, next) => {
+  console.log("CORS Middleware: Request received for:", req.originalUrl);
+  next();
+});
 
 // Rutas API
 app.use("/api/catalog", catalogRoutes);
@@ -188,3 +220,5 @@ server.listen(PORT, () => {
     CORS_ORIGIN: process.env.CORS_ORIGIN,
   });
 });
+
+console.log("CORS_ORIGIN:", process.env.CORS_ORIGIN);

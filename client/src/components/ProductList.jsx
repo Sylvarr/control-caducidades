@@ -937,18 +937,22 @@ const ProductList = () => {
 
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-2">
-                {products["sin-clasificar"].map((product) => {
-                  const isSelected =
-                    selectedProduct?.producto?._id === product.producto?._id;
-                  return (
-                    <div
-                      key={product.producto?._id}
-                      data-product-id={product.producto?._id}
-                      onClick={(e) => {
-                        handleProductClick(product);
-                        handleUpdateClick(product, e);
-                      }}
-                      className={`
+                {products["sin-clasificar"]
+                  .sort((a, b) =>
+                    a.producto?.nombre?.localeCompare(b.producto?.nombre)
+                  )
+                  .map((product) => {
+                    const isSelected =
+                      selectedProduct?.producto?._id === product.producto?._id;
+                    return (
+                      <div
+                        key={product.producto?._id}
+                        data-product-id={product.producto?._id}
+                        onClick={(e) => {
+                          handleProductClick(product);
+                          handleUpdateClick(product, e);
+                        }}
+                        className={`
                         w-full text-left 
                         bg-white hover:bg-gray-50
                         rounded-lg
@@ -959,13 +963,13 @@ const ProductList = () => {
                         p-4 product-card
                         cursor-pointer
                       `}
-                    >
-                      <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block transition-colors duration-200">
-                        {product.producto?.nombre}
-                      </span>
-                    </div>
-                  );
-                })}
+                      >
+                        <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block transition-colors duration-200">
+                          {product.producto?.nombre}
+                        </span>
+                      </div>
+                    );
+                  })}
               </div>
               <div className="h-4" />
             </div>

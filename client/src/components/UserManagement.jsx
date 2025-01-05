@@ -10,7 +10,11 @@ import {
 } from "lucide-react";
 import PropTypes from "prop-types";
 
-const UserManagement = ({ isOpen, onClose, currentUser }) => {
+const UserManagement = ({
+  isOpen = false,
+  onClose = () => {},
+  currentUser = null,
+}) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -451,18 +455,9 @@ const UserManagement = ({ isOpen, onClose, currentUser }) => {
 };
 
 UserManagement.propTypes = {
-  isOpen: PropTypes.bool.isRequired,
-  onClose: PropTypes.func.isRequired,
-  currentUser: PropTypes.shape({
-    _id: PropTypes.string,
-    username: PropTypes.string,
-    role: PropTypes.string,
-    restaurante: PropTypes.string,
-  }),
-};
-
-UserManagement.defaultProps = {
-  currentUser: null,
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func,
+  currentUser: PropTypes.object,
 };
 
 export default UserManagement;
