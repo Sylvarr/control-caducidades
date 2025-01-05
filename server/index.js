@@ -206,7 +206,7 @@ const connectWithRetry = async () => {
           username: "admin",
           password: "admin123456",
           role: "supervisor",
-          restaurante: "Mercadona Alcalá",
+          restaurante: "Restaurante",
         });
 
         try {
