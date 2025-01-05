@@ -1,6 +1,6 @@
 // API Base URL basada en el entorno
 const API_BASE_URL = import.meta.env.PROD
-  ? "https://tudominio.com/api" // URL de producción
+  ? `${window.location.origin}/api` // URL de producción
   : "http://localhost:5000/api"; // URL de desarrollo
 
 // Función auxiliar para obtener el token

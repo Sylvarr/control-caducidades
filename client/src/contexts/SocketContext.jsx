@@ -9,7 +9,7 @@ import { io } from "socket.io-client";
 import PropTypes from "prop-types";
 
 const SOCKET_URL = import.meta.env.PROD
-  ? "https://tudominio.com"
+  ? window.location.origin
   : "http://localhost:5000";
 
 const RECONNECTION_ATTEMPTS = 5;
