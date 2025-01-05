@@ -5,32 +5,45 @@ const bcrypt = require("bcryptjs");
 // Login
 exports.login = async (req, res) => {
   try {
+    console.log("Inicio de solicitud de login");
     const { username, password } = req.body;
+    console.log("Datos recibidos:", { username, password: "***" });
 
     // Validar entrada
     if (!username || !password) {
+      console.log("Error: Faltan credenciales");
       return res.status(400).json({
         error: "Usuario y contraseña son requeridos",
       });
     }
 
     // Buscar usuario
+    console.log("Buscando usuario en la base de datos...");
     const user = await User.findOne({ username }).select("+password");
+    console.log("Usuario encontrado:", user ? "Sí" : "No");
+
     if (!user) {
+      console.log("Error: Usuario no encontrado");
       return res.status(401).json({
         error: "Credenciales inválidas",
       });
     }
 
     // Verificar contraseña
+    console.log("Verificando contraseña...");
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log("Contraseña válida:", isMatch ? "Sí" : "No");
+
     if (!isMatch) {
+      console.log("Error: Contraseña incorrecta");
       return res.status(401).json({
         error: "Credenciales inválidas",
       });
     }
 
     // Generar token
+    console.log("Generando token JWT...");
+    console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
     const token = jwt.sign(
       {
         id: user._id,
@@ -40,8 +53,10 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
+    console.log("Token generado exitosamente");
 
     // Enviar respuesta
+    console.log("Enviando respuesta exitosa");
     res.json({
       token,
       user: {
@@ -51,9 +66,12 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error en login:", error);
+    console.error("Error detallado en login:", error);
+    console.error("Stack trace:", error.stack);
     res.status(500).json({
-      error: "Error al iniciar sesión",
+      error: "Error interno del servidor",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 };

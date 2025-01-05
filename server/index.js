@@ -183,18 +183,27 @@ const connectWithRetry = async () => {
 
   while (retries < maxRetries) {
     try {
+      console.log("Intentando conectar a MongoDB...");
+      console.log("MONGODB_URI disponible:", !!process.env.MONGODB_URI);
+      console.log("NODE_ENV:", process.env.NODE_ENV);
+
       await mongoose.connect(process.env.MONGODB_URI, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
       });
+
       console.log("Conectado a MongoDB exitosamente");
+      console.log("Base de datos:", mongoose.connection.name);
+      console.log("Host:", mongoose.connection.host);
       break;
     } catch (err) {
       retries++;
       console.error(
         `Error conectando a MongoDB (intento ${retries}/${maxRetries}):`,
-        err
+        err.message
       );
+      console.error("Stack trace:", err.stack);
+
       if (retries === maxRetries) {
         console.error(
           "No se pudo conectar a MongoDB después de múltiples intentos"
