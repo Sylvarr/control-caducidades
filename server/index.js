@@ -6,16 +6,29 @@ const http = require("http");
 const { Server } = require("socket.io");
 
 // Cargar variables de entorno según el entorno
-if (process.env.NODE_ENV === "production") {
-  console.log("Cargando variables de entorno de producción...");
-  require("dotenv").config({ path: ".env.production" });
-} else {
-  console.log("Cargando variables de entorno de desarrollo...");
-  require("dotenv").config();
+console.log("Directorio actual:", __dirname);
+const envPath = path.join(
+  __dirname,
+  process.env.NODE_ENV === "production" ? ".env.production" : ".env"
+);
+console.log("Intentando cargar archivo de variables de entorno:", envPath);
+
+try {
+  require("dotenv").config({ path: envPath });
+  console.log("Variables de entorno cargadas desde:", envPath);
+} catch (error) {
+  console.error("Error al cargar variables de entorno:", error);
 }
 
 // Verificar variables de entorno requeridas
 console.log("Verificando variables de entorno...");
+console.log("Variables disponibles:", {
+  NODE_ENV: process.env.NODE_ENV,
+  JWT_SECRET: process.env.JWT_SECRET ? "[PRESENTE]" : "[AUSENTE]",
+  MONGODB_URI: process.env.MONGODB_URI ? "[PRESENTE]" : "[AUSENTE]",
+  CORS_ORIGIN: process.env.CORS_ORIGIN ? "[PRESENTE]" : "[AUSENTE]",
+});
+
 const requiredEnvVars = ["JWT_SECRET", "MONGODB_URI"];
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 

@@ -75,18 +75,8 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error detallado en login:", error);
-    console.error("Stack trace:", error.stack);
-    console.error("Variables de entorno disponibles:", {
-      NODE_ENV: process.env.NODE_ENV,
-      JWT_SECRET_EXISTS: !!process.env.JWT_SECRET,
-      MONGODB_URI_EXISTS: !!process.env.MONGODB_URI,
-    });
-
-    // Construir mensaje de error detallado
-    const errorDetails = {
+    const errorInfo = {
       message: error.message,
-      stack: error.stack,
       type: error.name,
       code: error.code,
       env: {
@@ -96,10 +86,11 @@ exports.login = async (req, res) => {
       },
     };
 
-    res.status(500).json({
-      error: "Error interno del servidor",
-      details: errorDetails,
-    });
+    console.error("Error detallado en login:", errorInfo);
+    console.error("Stack trace:", error.stack);
+
+    // Siempre devolver los detalles del error
+    return res.status(500).json(errorInfo);
   }
 };
 
