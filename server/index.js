@@ -52,44 +52,44 @@ const authRoutes = require("./routes/authRoutes");
 const app = express();
 const server = http.createServer(app);
 
-const allowedOrigins =
-  process.env.NODE_ENV === "development"
-    ? [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-      ]
-    : process.env.CORS_ORIGIN.split(",");
+// Configuración de CORS
+const allowedOrigins = [
+  "https://control-caducidades-caducidades.up.railway.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Permitir solicitudes sin origin (como las herramientas de desarrollo)
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    console.log("Origin recibido:", origin);
+    console.log("Origins permitidos:", allowedOrigins);
+
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log("Origin blocked:", origin);
+      console.log("Origin bloqueado:", origin);
       callback(new Error("Not allowed by CORS"));
     }
   },
+  credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
   maxAge: 86400, // 24 horas
 };
 
-// Configuración de CORS para Express
+// Aplicar CORS como primer middleware
 app.use(cors(corsOptions));
 
-// Configuración de Socket.IO
+// Configuración de Socket.IO con las mismas opciones CORS
 const io = new Server(server, {
   cors: {
-    origin:
-      process.env.NODE_ENV === "development"
-        ? [
-            "http://localhost:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:5173",
-          ]
-        : process.env.CORS_ORIGIN.split(","),
+    origin: allowedOrigins,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
