@@ -83,10 +83,22 @@ exports.login = async (req, res) => {
       MONGODB_URI_EXISTS: !!process.env.MONGODB_URI,
     });
 
+    // Construir mensaje de error detallado
+    const errorDetails = {
+      message: error.message,
+      stack: error.stack,
+      type: error.name,
+      code: error.code,
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        JWT_SECRET_EXISTS: !!process.env.JWT_SECRET,
+        MONGODB_URI_EXISTS: !!process.env.MONGODB_URI,
+      },
+    };
+
     res.status(500).json({
       error: "Error interno del servidor",
-      details: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+      details: errorDetails,
     });
   }
 };

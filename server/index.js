@@ -5,32 +5,32 @@ const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
 
-// Cargar variables de entorno
-require("dotenv").config({
-  path: path.join(
-    __dirname,
-    process.env.NODE_ENV === "production" ? ".env.production" : ".env"
-  ),
-});
+// Cargar variables de entorno según el entorno
+if (process.env.NODE_ENV === "production") {
+  console.log("Cargando variables de entorno de producción...");
+  require("dotenv").config({ path: ".env.production" });
+} else {
+  console.log("Cargando variables de entorno de desarrollo...");
+  require("dotenv").config();
+}
 
-// Verificar variables de entorno críticas
-const requiredEnvVars = [
-  "JWT_SECRET",
-  "MONGODB_URI",
-  "NODE_ENV",
-  "CORS_ORIGIN",
-];
-const missingEnvVars = requiredEnvVars.filter(
-  (varName) => !process.env[varName]
-);
+// Verificar variables de entorno requeridas
+console.log("Verificando variables de entorno...");
+const requiredEnvVars = ["JWT_SECRET", "MONGODB_URI"];
+const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
   console.error(
-    "ERROR: Las siguientes variables de entorno son requeridas pero no están definidas:"
+    "Error: Faltan variables de entorno requeridas:",
+    missingEnvVars
   );
-  missingEnvVars.forEach((varName) => console.error(`- ${varName}`));
   process.exit(1);
 }
+
+console.log("Variables de entorno cargadas correctamente");
+console.log("NODE_ENV:", process.env.NODE_ENV);
+console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
+console.log("MONGODB_URI disponible:", !!process.env.MONGODB_URI);
 
 const catalogRoutes = require("./routes/catalogRoutes");
 const statusRoutes = require("./routes/statusRoutes");
