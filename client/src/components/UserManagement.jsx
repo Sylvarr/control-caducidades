@@ -9,6 +9,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import PropTypes from "prop-types";
+import config from "../config";
 
 const UserManagement = ({
   isOpen = false,
@@ -24,7 +25,7 @@ const UserManagement = ({
     username: "",
     password: "",
     role: "encargado",
-    restaurante: "Mercadona Alcalá",
+    restaurante: "Restaurante",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -34,7 +35,7 @@ const UserManagement = ({
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5000/api/auth/users", {
+      const response = await fetch(`${config.apiUrl}/auth/users`, {
         headers: {
           Authorization: `Bearer ${
             localStorage.getItem("token") || sessionStorage.getItem("token")
@@ -108,7 +109,7 @@ const UserManagement = ({
       setIsSubmitting(true);
       console.log("Enviando datos:", formData);
 
-      const response = await fetch("http://localhost:5000/api/auth/users", {
+      const response = await fetch(`${config.apiUrl}/auth/users`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -140,7 +141,7 @@ const UserManagement = ({
         username: "",
         password: "",
         role: "encargado",
-        restaurante: "Mercadona Alcalá",
+        restaurante: "Restaurante",
       });
       setError(null);
     } catch (err) {
@@ -157,17 +158,14 @@ const UserManagement = ({
   const handleDeleteUser = async (userId) => {
     try {
       setLoading(true);
-      const response = await fetch(
-        `http://localhost:5000/api/auth/users/${userId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${
-              localStorage.getItem("token") || sessionStorage.getItem("token")
-            }`,
-          },
-        }
-      );
+      const response = await fetch(`${config.apiUrl}/auth/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${
+            localStorage.getItem("token") || sessionStorage.getItem("token")
+          }`,
+        },
+      });
 
       if (!response.ok) throw new Error("Error al eliminar usuario");
 
@@ -197,7 +195,7 @@ const UserManagement = ({
             username: "",
             password: "",
             role: "encargado",
-            restaurante: "Mercadona Alcalá",
+            restaurante: "Restaurante",
           });
           setFormErrors({});
           onClose();
@@ -224,7 +222,7 @@ const UserManagement = ({
                 username: "",
                 password: "",
                 role: "encargado",
-                restaurante: "Mercadona Alcalá",
+                restaurante: "Restaurante",
               });
               setFormErrors({});
               onClose();
@@ -337,7 +335,7 @@ const UserManagement = ({
                       username: "",
                       password: "",
                       role: "encargado",
-                      restaurante: "Mercadona Alcalá",
+                      restaurante: "Restaurante",
                     });
                     setFormErrors({});
                     setError(null);
