@@ -10,12 +10,16 @@ import {
 } from "lucide-react";
 import PropTypes from "prop-types";
 import config from "../config";
+import usePreventScroll from "../hooks/usePreventScroll";
 
 const UserManagement = ({
   isOpen = false,
   onClose = () => {},
   currentUser = null,
 }) => {
+  // Usar el hook para prevenir scroll
+  usePreventScroll(isOpen);
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

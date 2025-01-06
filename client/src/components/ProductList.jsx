@@ -26,6 +26,8 @@ import PropTypes from "prop-types";
 import UserManagement from "./UserManagement";
 import CatalogManagement from "./CatalogManagement";
 import { useSocket } from "../contexts/SocketContext";
+import CustomDateInput from "./CustomDateInput";
+import usePreventScroll from "../hooks/usePreventScroll";
 
 // Constantes y funciones de utilidad
 const CATEGORY_TITLES = {
@@ -77,28 +79,6 @@ const ProductSkeleton = () => (
 );
 
 // Componentes auxiliares con PropTypes
-const CustomDateInput = ({ label, value, onChange }) => (
-  <div>
-    <label className="block text-sm font-semibold text-[#2d3748]">
-      {label}
-    </label>
-    <input
-      type="date"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="mt-1 block w-full rounded-md border-gray-300
-        focus:border-[#1d5030] focus:ring-[#1d5030]
-        shadow-sm text-[#2d3748]"
-    />
-  </div>
-);
-
-CustomDateInput.propTypes = {
-  label: PropTypes.string.isRequired,
-  value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-};
-
 const CustomCheckbox = ({ id, label, checked, disabled, onChange }) => (
   <div className="flex items-center">
     <input
@@ -186,6 +166,11 @@ const ProductList = () => {
   const [isClosingUnclassified, setIsClosingUnclassified] = useState(false);
   const [isClosingUpdateModal, setIsClosingUpdateModal] = useState(false);
   const [isClosingExpiringModal, setIsClosingExpiringModal] = useState(false);
+
+  // Usar el hook para prevenir scroll en los modales
+  usePreventScroll(isExpiringModalOpen);
+  usePreventScroll(showUnclassified);
+  usePreventScroll(isUpdateModalOpen);
 
   // Función mejorada para añadir toasts
   const addToast = useCallback((message, type = "info") => {

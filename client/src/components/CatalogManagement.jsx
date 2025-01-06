@@ -12,6 +12,7 @@ import PropTypes from "prop-types";
 import CreateProductModal from "./CreateProductModal";
 import { useSocket } from "../contexts/SocketContext";
 import { getAllCatalogProducts, deleteProduct } from "../services/api";
+import usePreventScroll from "../hooks/usePreventScroll";
 
 const TYPE_STYLES = {
   permanente: {
@@ -25,6 +26,9 @@ const TYPE_STYLES = {
 };
 
 const CatalogManagement = ({ isOpen, onClose }) => {
+  // Usar el hook para prevenir scroll
+  usePreventScroll(isOpen);
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

@@ -1,8 +1,12 @@
 import { useState, useCallback } from "react";
-import { X, RefreshCw, PackagePlus } from "lucide-react";
+import { PackagePlus, X, RefreshCw } from "lucide-react";
 import PropTypes from "prop-types";
+import usePreventScroll from "../hooks/usePreventScroll";
 
 const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
+  // Usar el hook para prevenir scroll
+  usePreventScroll(isOpen);
+
   const [formData, setFormData] = useState({
     nombre: "",
     tipo: "permanente",
