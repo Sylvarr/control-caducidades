@@ -742,7 +742,7 @@ const ProductList = () => {
 
   // Renderizado principal
   return (
-    <div className="max-w-md mx-auto p-4 bg-[#f8f8f8] min-h-screen relative">
+    <div className="max-w-md mx-auto p-4 bg-[#f8f8f8]">
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       <div className="flex flex-col items-center justify-center gap-1 mb-8">
@@ -968,10 +968,7 @@ const ProductList = () => {
       )}
 
       {/* Lista de productos */}
-      <div
-        className="product-list-container h-[calc(100vh-12rem)] overflow-y-auto"
-        data-scrollable
-      >
+      <div className="product-list-container">
         {Object.entries(filterProducts(products, searchTerm)).map(
           ([category, productList], index) =>
             searchTerm && productList.length === 0 ? null : (
