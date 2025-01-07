@@ -80,14 +80,14 @@ const ProductSkeleton = () => (
 
 // Componentes auxiliares con PropTypes
 const CustomCheckbox = ({ id, label, checked, disabled, onChange }) => (
-  <div className="flex items-center">
+  <div className="flex items-center py-2.5 px-3 my-1.5 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors duration-200">
     <input
       type="checkbox"
       id={id}
       checked={checked}
       disabled={disabled}
       onChange={(e) => onChange(e.target.checked)}
-      className={`h-4 w-4 focus:ring-[#1d5030] border-gray-300 rounded
+      className={`w-4.5 h-4.5 focus:ring-[#1d5030] border-gray-300 rounded
         ${
           disabled
             ? "bg-gray-200 text-gray-400 cursor-not-allowed"
@@ -96,7 +96,7 @@ const CustomCheckbox = ({ id, label, checked, disabled, onChange }) => (
     />
     <label
       htmlFor={id}
-      className={`ml-2 text-sm font-semibold
+      className={`pl-2.5 font-medium select-none text-sm
         ${disabled ? "text-gray-400" : "text-[#2d3748]"}`}
     >
       {label}
@@ -259,7 +259,7 @@ const ProductList = () => {
     };
 
     loadUser();
-  }, []);
+  }, [setUser]);
 
   // Efecto para manejar clics fuera
   useEffect(() => {
@@ -1170,16 +1170,21 @@ const ProductList = () => {
 
           <div
             className={`
-            relative z-10 bg-white rounded-lg p-6 w-full max-w-md
+            relative z-10 bg-white rounded-lg w-full max-w-md
             ${isClosingUpdateModal ? "animate-slide-out" : "animate-slide-in"}
             transform transition-all duration-300 ease-out
             `}
           >
-            <h3 className="text-xl font-semibold text-[#2d3748] mb-6 select-none">
-              Actualizar estado de {editingProduct?.producto?.nombre}
-            </h3>
+            <div className="px-5 py-3.5 border-b border-gray-100">
+              <h3 className="text-lg font-medium text-[#2d3748] select-none">
+                Actualizar estado de{" "}
+                <span className="block text-xl text-[#1d5030] font-semibold mt-1">
+                  {editingProduct?.producto?.nombre}
+                </span>
+              </h3>
+            </div>
 
-            <div className="space-y-5">
+            <div className="p-5 space-y-4">
               <CustomDateInput
                 label="Fecha Frente"
                 value={updateForm.fechaFrente}
@@ -1213,7 +1218,7 @@ const ProductList = () => {
                 />
               )}
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <CustomCheckbox
                   id="cajaUnica"
                   label="Solo queda una caja"
@@ -1245,12 +1250,12 @@ const ProductList = () => {
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex justify-end gap-3 pt-3">
                 <button
                   onClick={() => {
                     handleCloseUpdateModal();
                   }}
-                  className="px-4 py-2 text-sm font-medium text-[#2d3748]
+                  className="min-h-[42px] px-5 text-sm font-medium text-[#2d3748]
                     bg-gray-50 hover:bg-gray-100
                     rounded-lg transition-colors duration-200"
                 >
@@ -1259,7 +1264,7 @@ const ProductList = () => {
                 <button
                   onClick={handleSubmitUpdate}
                   disabled={isUpdating}
-                  className="px-4 py-2 text-sm font-medium text-white
+                  className="min-h-[42px] px-5 text-sm font-medium text-white
                     bg-[#1d5030] hover:bg-[#1d5030]/90
                     rounded-lg transition-colors duration-200
                     disabled:opacity-50 disabled:cursor-not-allowed

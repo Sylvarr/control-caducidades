@@ -1,5 +1,4 @@
 const ProductStatus = require("../models/Product");
-const CatalogProduct = require("../models/CatalogProduct");
 
 // Es importante que TODAS las funciones estén definidas
 exports.getAllStatus = async (req, res) => {

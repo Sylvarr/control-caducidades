@@ -173,17 +173,17 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
           onClick={() => !disabled && setIsOpen(true)}
           disabled={disabled}
           className={`
-            flex items-center gap-2 px-4 py-2 rounded-md
+            flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg w-full
             font-medium text-sm transition-all duration-200
             ${
               disabled
                 ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                 : "bg-white text-[#2d3748] hover:bg-gray-50 active:bg-gray-100"
             }
-            border border-gray-300 shadow-sm
+            border border-gray-200 shadow-sm hover:border-[#1d5030]/20
           `}
         >
-          <Calendar className="w-4 h-4" />
+          <Calendar className="w-4.5 h-4.5 text-[#1d5030]" />
           {value ? (
             <span>{inputValue}</span>
           ) : (
@@ -198,10 +198,10 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
               onChange("");
               setInputValue("");
             }}
-            className="p-2 text-gray-400 hover:text-gray-600
-              hover:bg-gray-100 rounded-md transition-colors"
+            className="p-2.5 text-gray-400 hover:text-gray-600
+              hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4.5 h-4.5" />
           </button>
         )}
       </div>
