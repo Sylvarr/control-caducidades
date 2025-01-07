@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import PropTypes from "prop-types";
 import { X, Calendar, AlertCircle } from "lucide-react";
 import usePreventScroll from "../hooks/usePreventScroll";
@@ -46,22 +46,31 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
-  // Validar fecha
+  // Validar fecha y que no sea más de 5 años en el futuro
   const isValidDate = useCallback((day, month, year) => {
     const date = new Date(year, month - 1, day);
-    return (
+    const isValidFormat =
       date.getDate() === parseInt(day) &&
       date.getMonth() === month - 1 &&
-      date.getFullYear() === parseInt(year)
-    );
+      date.getFullYear() === parseInt(year);
+
+    const currentYear = new Date().getFullYear();
+    const isValidYear = year <= currentYear + 5;
+
+    return isValidFormat && isValidYear;
   }, []);
 
-  // Validar que la fecha no sea anterior a hoy
+  // Validar que la fecha no sea anterior a hoy ni posterior a 5 años
   const isDateAfterToday = useCallback((day, month, year) => {
     const inputDate = new Date(year, month - 1, day);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return inputDate >= today;
+
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + 5);
+    maxDate.setHours(23, 59, 59, 999);
+
+    return inputDate >= today && inputDate <= maxDate;
   }, []);
 
   // Formatear entrada mientras se escribe
@@ -89,12 +98,30 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
 
       if (dateString.length === 10) {
         if (!isValidDate(day, month, year)) {
-          setError("Fecha inválida");
+          const currentYear = new Date().getFullYear();
+          if (year > currentYear + 5) {
+            setError(`El año no puede ser posterior a ${currentYear + 5}`);
+          } else {
+            setError("Fecha inválida");
+          }
           return;
         }
 
         if (!isDateAfterToday(day, month, year)) {
-          setError("La fecha no puede ser anterior a hoy");
+          const maxDate = new Date();
+          maxDate.setFullYear(maxDate.getFullYear() + 5);
+          if (new Date(year, month - 1, day) > maxDate) {
+            setError(
+              `La fecha no puede ser posterior a ${maxDate
+                .getDate()
+                .toString()
+                .padStart(2, "0")}/${(maxDate.getMonth() + 1)
+                .toString()
+                .padStart(2, "0")}/${maxDate.getFullYear()}`
+            );
+          } else {
+            setError("La fecha no puede ser anterior a hoy");
+          }
           return;
         }
 
@@ -123,10 +150,19 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
     [formatInput, validateAndUpdate]
   );
 
-  // Manejar clic en número del teclado
+  // Debounce function
+  const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
+
+  // Manejar clic en número del teclado con debounce
   const handleKeypadClick = useCallback(
-    (e, num) => {
-      e.stopPropagation(); // Evitar que el click se propague
+    debounce((e, num) => {
+      e.stopPropagation();
 
       // Si ya hay una fecha completa (10 caracteres), borrar todo y empezar de nuevo
       if (inputValue.length === 10) {
@@ -142,7 +178,7 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
           validateAndUpdate(newValue);
         }
       }
-    },
+    }, 50),
     [inputValue, formatInput, validateAndUpdate]
   );
 
@@ -164,6 +200,72 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
     setInputValue("");
     setError("");
   }, []);
+
+  // Memoizar los botones del teclado para evitar re-renders innecesarios
+  const keypadButtons = useMemo(
+    () => [
+      ...Array(9)
+        .fill(null)
+        .map((_, i) => ({
+          value: i + 1,
+          label: (i + 1).toString(),
+          action: handleKeypadClick,
+        })),
+      {
+        value: "clear",
+        label: "C",
+        action: handleClear,
+        variant: "secondary",
+      },
+      {
+        value: 0,
+        label: "0",
+        action: handleKeypadClick,
+      },
+      {
+        value: "delete",
+        label: "←",
+        action: handleDelete,
+        variant: "secondary",
+      },
+    ],
+    [handleKeypadClick, handleClear, handleDelete]
+  );
+
+  // Manejar entrada de teclado físico
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!isOpen) return;
+
+      // Números del 0-9
+      if (/^\d$/.test(e.key)) {
+        e.preventDefault();
+        handleKeypadClick(e, parseInt(e.key));
+      }
+      // Borrar con Backspace o Delete
+      else if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault();
+        handleDelete(e);
+      }
+      // Escape: limpiar si hay input, cerrar si no hay
+      else if (e.key === "Escape") {
+        e.preventDefault();
+        if (inputValue) {
+          handleClear(e);
+        } else {
+          setIsOpen(false);
+        }
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, handleKeypadClick, handleDelete, handleClear, inputValue]);
 
   return (
     <div>
@@ -273,46 +375,35 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
 
               {/* Teclado numérico */}
               <div className="p-4">
-                <div ref={keypadRef} className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                <div ref={keypadRef} className="grid grid-cols-3 gap-3">
+                  {keypadButtons.map((button) => (
                     <button
-                      key={num}
-                      onClick={(e) => handleKeypadClick(e, num)}
-                      className="w-14 h-14 flex items-center justify-center
-                        text-[#2d3748] text-lg font-medium rounded-md
-                        hover:bg-gray-100 active:bg-gray-200
-                        transition-colors duration-150"
+                      key={button.value}
+                      onClick={(e) => button.action(e, button.value)}
+                      className={`
+                        min-h-[56px] flex items-center justify-center
+                        ${
+                          button.variant === "secondary"
+                            ? "text-gray-600 bg-gray-100 hover:bg-gray-200 active:bg-gray-300"
+                            : "text-gray-700 bg-gray-50 hover:bg-gray-100 active:bg-gray-200"
+                        }
+                        ${
+                          typeof button.value === "number"
+                            ? "text-2xl"
+                            : "text-lg"
+                        }
+                        font-medium rounded-lg
+                        border border-gray-100
+                        transition-transform duration-100
+                        active:scale-[0.97]
+                        focus:outline-none
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        select-none
+                      `}
                     >
-                      {num}
+                      {button.label}
                     </button>
                   ))}
-                  <button
-                    onClick={handleClear}
-                    className="w-14 h-14 flex items-center justify-center
-                      text-gray-600 rounded-md
-                      hover:bg-gray-100 active:bg-gray-200
-                      transition-colors duration-150"
-                  >
-                    C
-                  </button>
-                  <button
-                    onClick={(e) => handleKeypadClick(e, 0)}
-                    className="w-14 h-14 flex items-center justify-center
-                      text-[#2d3748] text-lg font-medium rounded-md
-                      hover:bg-gray-100 active:bg-gray-200
-                      transition-colors duration-150"
-                  >
-                    0
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="w-14 h-14 flex items-center justify-center
-                      text-gray-600 rounded-md
-                      hover:bg-gray-100 active:bg-gray-200
-                      transition-colors duration-150"
-                  >
-                    ←
-                  </button>
                 </div>
               </div>
             </div>
