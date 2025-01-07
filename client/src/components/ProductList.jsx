@@ -32,8 +32,8 @@ import usePreventScroll from "../hooks/usePreventScroll";
 // Constantes y funciones de utilidad
 const CATEGORY_TITLES = {
   "sin-clasificar": "SIN CLASIFICAR",
-  "frente-agota": "FRENTE Y AGOTA",
   "frente-cambia": "FRENTE Y CAMBIA",
+  "frente-agota": "FRENTE Y AGOTA",
   "abierto-cambia": "ABIERTO Y CAMBIA",
   "abierto-agota": "ABIERTO Y AGOTA",
 };
@@ -139,8 +139,8 @@ const ProductList = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [products, setProducts] = useState({
     "sin-clasificar": [],
-    "frente-agota": [],
     "frente-cambia": [],
+    "frente-agota": [],
     "abierto-cambia": [],
     "abierto-agota": [],
   });
@@ -168,9 +168,9 @@ const ProductList = () => {
   const [isClosingExpiringModal, setIsClosingExpiringModal] = useState(false);
 
   // Usar el hook para prevenir scroll en los modales
-  usePreventScroll(isExpiringModalOpen);
-  usePreventScroll(showUnclassified);
-  usePreventScroll(isUpdateModalOpen);
+  usePreventScroll(isUpdateModalOpen && !isClosingUpdateModal);
+  usePreventScroll(showUnclassified && !isClosingUnclassified);
+  usePreventScroll(isExpiringModalOpen && !isClosingExpiringModal);
 
   // Función mejorada para añadir toasts
   const addToast = useCallback((message, type = "info") => {
@@ -311,11 +311,11 @@ const ProductList = () => {
             (product) => product.estado === "sin-clasificar"
           ),
         ],
-        "frente-agota": statusData.filter(
-          (product) => product.estado === "frente-agota"
-        ),
         "frente-cambia": statusData.filter(
           (product) => product.estado === "frente-cambia"
+        ),
+        "frente-agota": statusData.filter(
+          (product) => product.estado === "frente-agota"
         ),
         "abierto-cambia": statusData.filter(
           (product) => product.estado === "abierto-cambia"
@@ -621,6 +621,8 @@ const ProductList = () => {
     setTimeout(() => {
       setShowUnclassified(false);
       setIsClosingUnclassified(false);
+      // Restaurar el scroll después de cerrar el modal
+      document.body.style.overflow = "";
     }, 150);
   };
 
@@ -630,6 +632,8 @@ const ProductList = () => {
       setIsUpdateModalOpen(false);
       setEditingProduct(null);
       setIsClosingUpdateModal(false);
+      // Restaurar el scroll después de cerrar el modal
+      document.body.style.overflow = "";
     }, 150);
   };
 

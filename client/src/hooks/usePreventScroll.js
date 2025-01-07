@@ -1,55 +1,34 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-const usePreventScroll = (isOpen) => {
-  const previousOverflowRef = useRef("");
-
+const usePreventScroll = (shouldPrevent) => {
   useEffect(() => {
-    if (isOpen) {
-      // Guardar el valor actual de overflow
-      previousOverflowRef.current = document.body.style.overflow;
+    if (shouldPrevent) {
+      // Guardar el scroll actual
+      const scrollY = window.scrollY;
 
-      // Prevenir scroll en el body
-      document.body.style.overflow = "hidden";
+      // Prevenir scroll
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = "100%";
+    } else {
+      // Restaurar scroll
+      const scrollY = document.body.style.top;
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
 
-      // Prevenir scroll en dispositivos táctiles solo fuera de los modales
-      const preventDefault = (e) => {
-        const modalContent = e.target.closest("[data-modal-content]");
-        const scrollableContent = e.target.closest("[data-scrollable]");
-
-        if (modalContent && scrollableContent) {
-          // Permitir scroll si estamos dentro de un área scrolleable dentro del modal
-          const { scrollHeight, clientHeight, scrollTop } = scrollableContent;
-          const isAtTop = scrollTop <= 0;
-          const isAtBottom = scrollTop + clientHeight >= scrollHeight;
-
-          // Permitir scroll si no estamos en los límites
-          if (!isAtTop || !isAtBottom) {
-            e.stopPropagation();
-            return;
-          }
-        }
-
-        // Prevenir scroll si estamos fuera de un modal o área scrolleable
-        if (!modalContent && !scrollableContent) {
-          e.preventDefault();
-        }
-      };
-
-      document.body.addEventListener("touchmove", preventDefault, {
-        passive: false,
-      });
-      document.body.addEventListener("wheel", preventDefault, {
-        passive: false,
-      });
-
-      // Cleanup
-      return () => {
-        document.body.style.overflow = previousOverflowRef.current;
-        document.body.removeEventListener("touchmove", preventDefault);
-        document.body.removeEventListener("wheel", preventDefault);
-      };
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY.replace("-", "")) || 0);
+      }
     }
-  }, [isOpen]);
+
+    return () => {
+      // Limpiar estilos al desmontar
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.width = "";
+    };
+  }, [shouldPrevent]);
 };
 
 export default usePreventScroll;
