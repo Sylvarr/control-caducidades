@@ -900,8 +900,10 @@ const ProductList = () => {
             max-h-[calc(100vh-8rem)] flex flex-col z-10
             ${isClosingUnclassified ? "animate-slide-up" : "animate-slide-down"}
             transition-all duration-300 ease-out
+            overflow-hidden
             `}
             onClick={(e) => e.stopPropagation()}
+            data-modal-content
           >
             <div className="flex-none sticky top-0 z-10 bg-white border-b border-gray-200">
               <div className="px-4 py-3 flex items-center justify-between">
@@ -920,7 +922,10 @@ const ProductList = () => {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain p-4"
+              data-scrollable
+            >
               <div className="space-y-2">
                 {products["sin-clasificar"]
                   .sort((a, b) =>
@@ -963,7 +968,10 @@ const ProductList = () => {
       )}
 
       {/* Lista de productos */}
-      <div className="product-list-container">
+      <div
+        className="product-list-container h-[calc(100vh-12rem)] overflow-y-auto"
+        data-scrollable
+      >
         {Object.entries(filterProducts(products, searchTerm)).map(
           ([category, productList], index) =>
             searchTerm && productList.length === 0 ? null : (
@@ -1324,7 +1332,7 @@ const ProductList = () => {
             </div>
 
             {/* Lista de productos agrupada */}
-            <div className="overflow-y-auto">
+            <div className="overflow-y-auto" data-scrollable>
               {Object.entries(getGroupedExpiringProducts()).map(
                 ([key, { title, color, products }]) =>
                   products.length > 0 && (

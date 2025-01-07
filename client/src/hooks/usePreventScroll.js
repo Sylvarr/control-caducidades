@@ -11,10 +11,26 @@ const usePreventScroll = (isOpen) => {
       // Prevenir scroll en el body
       document.body.style.overflow = "hidden";
 
-      // Prevenir scroll en dispositivos táctiles
+      // Prevenir scroll en dispositivos táctiles solo fuera de los modales
       const preventDefault = (e) => {
         const modalContent = e.target.closest("[data-modal-content]");
-        if (!modalContent || !modalContent.contains(e.target)) {
+        const scrollableContent = e.target.closest("[data-scrollable]");
+
+        if (modalContent && scrollableContent) {
+          // Permitir scroll si estamos dentro de un área scrolleable dentro del modal
+          const { scrollHeight, clientHeight, scrollTop } = scrollableContent;
+          const isAtTop = scrollTop <= 0;
+          const isAtBottom = scrollTop + clientHeight >= scrollHeight;
+
+          // Permitir scroll si no estamos en los límites
+          if (!isAtTop || !isAtBottom) {
+            e.stopPropagation();
+            return;
+          }
+        }
+
+        // Prevenir scroll si estamos fuera de un modal o área scrolleable
+        if (!modalContent && !scrollableContent) {
           e.preventDefault();
         }
       };

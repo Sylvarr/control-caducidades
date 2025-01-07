@@ -200,6 +200,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
         <div
           className="relative w-full max-w-2xl bg-white rounded-lg shadow-xl z-10
           animate-[slideIn_0.3s_ease-out]"
+          data-modal-content
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -218,7 +219,10 @@ const CatalogManagement = ({ isOpen, onClose }) => {
           </div>
 
           {/* Content */}
-          <div className="p-4">
+          <div
+            className="p-4 max-h-[calc(100vh-12rem)] overflow-y-auto"
+            data-scrollable
+          >
             {error && (
               <div
                 className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm
