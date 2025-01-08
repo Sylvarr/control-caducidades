@@ -4,6 +4,8 @@ const cors = require("cors");
 const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
+const rateLimit = require("express-rate-limit");
+const dotenv = require("dotenv");
 
 // Cargar variables de entorno según el entorno
 console.log("Directorio actual:", __dirname);
@@ -134,6 +136,48 @@ app.use((req, res, next) => {
   console.log("CORS Middleware: Request received for:", req.originalUrl);
   next();
 });
+
+// Configurar rate limiter
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Límite de 100 solicitudes por ventana por IP
+  standardHeaders: true, // Devolver info de rate limit en los headers `RateLimit-*`
+  legacyHeaders: false, // Deshabilitar los headers `X-RateLimit-*`
+  message: {
+    error: "Demasiadas solicitudes, por favor intente más tarde.",
+    details: "Se ha excedido el límite de solicitudes permitidas.",
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Demasiadas solicitudes, por favor intente más tarde.",
+      details: "Se ha excedido el límite de solicitudes permitidas.",
+    });
+  },
+});
+
+// Configurar rate limiter específico para autenticación
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // Límite de 5 intentos de login por ventana por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Demasiados intentos de inicio de sesión.",
+    details: "Por favor, espere antes de intentar nuevamente.",
+  },
+  handler: (req, res) => {
+    res.status(429).json({
+      error: "Demasiados intentos de inicio de sesión.",
+      details: "Por favor, espere antes de intentar nuevamente.",
+    });
+  },
+});
+
+// Aplicar rate limiter global a todas las rutas
+app.use(limiter);
+
+// Aplicar rate limiter específico para rutas de autenticación
+app.use("/api/auth/login", authLimiter);
 
 // Rutas API
 app.use("/api/catalog", catalogRoutes);

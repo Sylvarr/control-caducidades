@@ -1,20 +1,7 @@
 import { useState, useEffect, useCallback, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../App";
-import {
-  Search,
-  RefreshCw,
-  AlertCircle,
-  Edit3,
-  Trash2,
-  Box,
-  Clock,
-  X,
-  ChevronRight,
-  LogOut,
-  Users,
-  Package,
-} from "lucide-react";
+import { AlertCircle, X, LogOut, Users, Package } from "lucide-react";
 import {
   getAllProductStatus,
   getAllCatalogProducts,
@@ -26,8 +13,11 @@ import PropTypes from "prop-types";
 import UserManagement from "./UserManagement";
 import CatalogManagement from "./CatalogManagement";
 import { useSocket } from "../contexts/SocketContext";
-import CustomDateInput from "./CustomDateInput";
 import usePreventScroll from "../hooks/usePreventScroll";
+import SearchBar from "./SearchBar";
+import ProductCard from "./ProductCard";
+import UpdateModal from "./UpdateModal";
+import ExpiringModal from "./ExpiringModal";
 
 // Constantes y funciones de utilidad
 const CATEGORY_TITLES = {
@@ -36,23 +26,6 @@ const CATEGORY_TITLES = {
   "frente-agota": "FRENTE Y AGOTA",
   "abierto-cambia": "ABIERTO Y CAMBIA",
   "abierto-agota": "ABIERTO Y AGOTA",
-};
-
-const formatDate = (dateString) => {
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "Fecha inválida";
-
-    return date.getFullYear() !== new Date().getFullYear()
-      ? `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
-          .toString()
-          .padStart(2, "0")}/${date.getFullYear()}`
-      : `${date.getDate().toString().padStart(2, "0")}/${(date.getMonth() + 1)
-          .toString()
-          .padStart(2, "0")}`;
-  } catch {
-    return "Fecha inválida";
-  }
 };
 
 // Componente ProductSkeleton
@@ -826,56 +799,12 @@ const ProductList = () => {
         </div>
       </div>
 
-      <div className="flex gap-2 mb-6">
-        {/* Buscador más compacto */}
-        <div className="flex-1 relative search-container">
-          <input
-            type="text"
-            placeholder="Buscar producto..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onFocus={() => setIsFocused(true)}
-            className="w-full h-10 pl-9 pr-9 rounded-lg border-0 
-              focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50 focus:border-transparent
-              font-['Noto Sans'] text-sm font-medium placeholder:text-gray-400
-              bg-white shadow-sm"
-          />
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#1d5030] w-4 h-4" />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1
-                text-gray-400 hover:text-gray-600
-                rounded-full hover:bg-gray-100
-                transition-all duration-200"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Botón para productos sin clasificar */}
-        <button
-          onClick={() => setShowUnclassified(!showUnclassified)}
-          className={`
-            h-10 px-3 rounded-lg
-            font-['Noto Sans'] text-sm font-medium select-none
-            transition-colors duration-200
-            flex items-center gap-2
-            ${
-              showUnclassified
-                ? "bg-[#1d5030] text-white hover:bg-[#1d5030]/90"
-                : "bg-white text-[#1d5030] hover:bg-gray-50"
-            }
-            shadow-sm
-          `}
-        >
-          Sin Clasificar
-          <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs select-none">
-            {products["sin-clasificar"].length}
-          </span>
-        </button>
-      </div>
+      <SearchBar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        unclassifiedCount={products["sin-clasificar"].length}
+        onUnclassifiedClick={() => setShowUnclassified(!showUnclassified)}
+      />
 
       {/* Lista de productos sin clasificar */}
       {showUnclassified && (
@@ -935,35 +864,23 @@ const ProductList = () => {
                   .sort((a, b) =>
                     a.producto?.nombre?.localeCompare(b.producto?.nombre)
                   )
-                  .map((product) => {
-                    const isSelected =
-                      selectedProduct?.producto?._id === product.producto?._id;
-                    return (
-                      <div
-                        key={product.producto?._id}
-                        data-product-id={product.producto?._id}
-                        onClick={(e) => {
-                          handleProductClick(product);
-                          handleUpdateClick(product, e);
-                        }}
-                        className={`
-                        w-full text-left 
-                        bg-white hover:bg-gray-50
-                        rounded-lg
-                        shadow-sm hover:shadow
-                        transition-all duration-200
-                        ${isSelected ? "ring-1 ring-[#1d5030]/30" : ""}
-                        active:scale-[0.995]
-                        p-4 product-card
-                        cursor-pointer
-                      `}
-                      >
-                        <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base block transition-colors duration-200">
-                          {product.producto?.nombre}
-                        </span>
-                      </div>
-                    );
-                  })}
+                  .map((product) => (
+                    <ProductCard
+                      key={product.producto?._id}
+                      product={product}
+                      isSelected={
+                        selectedProduct?.producto?._id === product.producto?._id
+                      }
+                      isExpiringSoon={isExpiringSoon}
+                      lastUpdatedProductId={lastUpdatedProductId}
+                      onProductClick={(p) => {
+                        handleProductClick(p);
+                        handleUpdateClick(p);
+                      }}
+                      onUpdateClick={handleUpdateClick}
+                      onDeleteClick={handleDeleteClick}
+                    />
+                  ))}
               </div>
               <div className="h-4" />
             </div>
@@ -998,152 +915,20 @@ const ProductList = () => {
 
                 {/* Lista de productos */}
                 <div className="space-y-2 ml-2">
-                  {productList.map((product) => {
-                    const isSelected =
-                      selectedProduct?.producto?._id === product.producto?._id;
-                    return (
-                      <div
-                        key={product.producto?._id}
-                        data-product-id={product.producto?._id}
-                        onClick={() => handleProductClick(product)}
-                        className={`
-                          w-full text-left 
-                          bg-white hover:bg-gray-50
-                          rounded-lg
-                          shadow-sm hover:shadow
-                          transition-all duration-500
-                          ${isSelected ? "ring-1 ring-[#1d5030]/30" : ""}
-                          ${
-                            lastUpdatedProductId === product.producto?._id
-                              ? "animate-highlight bg-[#1d5030]/5"
-                              : ""
-                          }
-                          active:scale-[0.995]
-                          p-4 product-card
-                          cursor-pointer
-                        `}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-['Noto Sans'] font-semibold text-[#2d3748] text-base flex-1 select-none">
-                            {product.producto?.nombre}
-                          </span>
-                          {isExpiringSoon(product.fechaFrente) && (
-                            <div
-                              className="
-                              w-2 h-2 
-                              rounded-full 
-                              bg-[#ffb81c]
-                              shadow-[0_0_6px_rgba(255,184,28,0.5)]
-                              animate-pulse
-                              transition-opacity duration-300
-                            "
-                            />
-                          )}
-                        </div>
-
-                        {/* Contenido expandible */}
-                        <div
-                          className={`
-                          transform transition-all duration-300
-                          ${
-                            isSelected
-                              ? "max-h-[500px] opacity-100 mt-4"
-                              : "max-h-0 opacity-0"
-                          }
-                          overflow-hidden
-                        `}
-                        >
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              {product.fechaFrente && (
-                                <div className="bg-[#f8f8f8] rounded-md p-3">
-                                  <div
-                                    className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
-                                    text-[14px] font-semibold mb-2 select-none"
-                                  >
-                                    FRENTE
-                                  </div>
-                                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
-                                    {formatDate(product.fechaFrente)}
-                                  </div>
-                                </div>
-                              )}
-                              {product.fechaAlmacen && (
-                                <div className="bg-[#f8f8f8] rounded-md p-3">
-                                  <div
-                                    className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
-                                    text-[14px] font-semibold mb-2 select-none"
-                                  >
-                                    ALMACÉN
-                                  </div>
-                                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
-                                    {formatDate(product.fechaAlmacen)}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            {(product.hayOtrasFechas || product.cajaUnica) && (
-                              <div className="flex flex-wrap gap-2">
-                                {product.hayOtrasFechas && (
-                                  <div
-                                    className="inline-flex items-center px-2.5 py-1 rounded-md
-                                    bg-[#1d5030]/5 text-[#1d5030] text-sm select-none"
-                                  >
-                                    <Clock className="w-3.5 h-3.5 mr-1" />
-                                    Hay otras fechas
-                                  </div>
-                                )}
-                                {product.cajaUnica && (
-                                  <div
-                                    className="inline-flex items-center px-2.5 py-1 rounded-md
-                                    bg-[#ffb81c]/5 text-[#1d5030] text-sm select-none"
-                                  >
-                                    <Box className="w-3.5 h-3.5 mr-1" />
-                                    Última caja
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            <div className="flex items-center justify-between pt-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleUpdateClick(product, e);
-                                }}
-                                className="flex-1 py-2 text-white rounded-md
-                                  bg-[#1d5030] hover:bg-[#1d5030]/90
-                                  transition-colors duration-200
-                                  font-medium text-sm select-none
-                                  flex items-center justify-center gap-1.5
-                                  shadow-sm hover:shadow
-                                  mr-2"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                                Actualizar Estado
-                              </button>
-                              {(product.estado !== "sin-clasificar" ||
-                                product.fechaFrente ||
-                                product.fechaAlmacen) && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteClick(product, e);
-                                  }}
-                                  className="min-w-[48px] h-[40px] flex items-center justify-center
-                                    text-gray-400 rounded-md
-                                    hover:text-red-500 hover:bg-red-50
-                                    transition-colors duration-200
-                                    active:bg-red-100"
-                                >
-                                  <Trash2 className="w-5 h-5" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {productList.map((product) => (
+                    <ProductCard
+                      key={product.producto?._id}
+                      product={product}
+                      isSelected={
+                        selectedProduct?.producto?._id === product.producto?._id
+                      }
+                      isExpiringSoon={isExpiringSoon}
+                      lastUpdatedProductId={lastUpdatedProductId}
+                      onProductClick={handleProductClick}
+                      onUpdateClick={handleUpdateClick}
+                      onDeleteClick={handleDeleteClick}
+                    />
+                  ))}
                 </div>
               </div>
             )
@@ -1151,302 +936,25 @@ const ProductList = () => {
       </div>
 
       {/* Modal de actualización */}
-      {isUpdateModalOpen && (
-        <div
-          className={`
-          fixed inset-0 flex items-center justify-center p-4 z-50
-          ${isClosingUpdateModal ? "animate-fade-out" : "animate-fade-in"}
-          `}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleCloseUpdateModal();
-            }
-          }}
-        >
-          {/* Fondo oscuro clickeable */}
-          <div
-            className="fixed inset-0 bg-black/50 transition-opacity duration-300"
-            onClick={() => {
-              setIsUpdateModalOpen(false);
-              setEditingProduct(null);
-            }}
-          />
-
-          <div
-            className={`
-            relative z-10 bg-white rounded-lg w-full max-w-md
-            ${isClosingUpdateModal ? "animate-slide-out" : "animate-slide-in"}
-            transform transition-all duration-300 ease-out
-            `}
-          >
-            <div className="px-5 py-3.5 border-b border-gray-100">
-              <h3 className="text-lg font-medium text-[#2d3748] select-none">
-                Actualizar estado de{" "}
-                <span className="block text-xl text-[#1d5030] font-semibold mt-1">
-                  {editingProduct?.producto?.nombre}
-                </span>
-              </h3>
-            </div>
-
-            <div className="p-5 space-y-4">
-              <CustomDateInput
-                label="Fecha Frente"
-                value={updateForm.fechaFrente}
-                onChange={(value) =>
-                  setUpdateForm({ ...updateForm, fechaFrente: value })
-                }
-              />
-
-              <CustomCheckbox
-                id="noHayEnAlmacen"
-                label="No hay producto en almacén"
-                checked={updateForm.noHayEnAlmacen}
-                onChange={(checked) =>
-                  setUpdateForm({
-                    ...updateForm,
-                    noHayEnAlmacen: checked,
-                    fechaAlmacen: checked ? "" : updateForm.fechaAlmacen,
-                    cajaUnica: checked ? false : updateForm.cajaUnica,
-                    hayOtrasFechas: checked ? false : updateForm.hayOtrasFechas,
-                  })
-                }
-              />
-
-              {!updateForm.noHayEnAlmacen && (
-                <CustomDateInput
-                  label="Fecha Almacén"
-                  value={updateForm.fechaAlmacen}
-                  onChange={(value) =>
-                    setUpdateForm({ ...updateForm, fechaAlmacen: value })
-                  }
-                />
-              )}
-
-              <div className="space-y-2">
-                <CustomCheckbox
-                  id="cajaUnica"
-                  label="Solo queda una caja"
-                  checked={updateForm.cajaUnica}
-                  disabled={
-                    updateForm.noHayEnAlmacen || updateForm.hayOtrasFechas
-                  }
-                  onChange={(checked) =>
-                    setUpdateForm({
-                      ...updateForm,
-                      cajaUnica: checked,
-                      hayOtrasFechas: false,
-                    })
-                  }
-                />
-
-                <CustomCheckbox
-                  id="hayOtrasFechas"
-                  label="Hay más fechas"
-                  checked={updateForm.hayOtrasFechas}
-                  disabled={updateForm.noHayEnAlmacen || updateForm.cajaUnica}
-                  onChange={(checked) =>
-                    setUpdateForm({
-                      ...updateForm,
-                      hayOtrasFechas: checked,
-                      cajaUnica: false,
-                    })
-                  }
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-3">
-                <button
-                  onClick={() => {
-                    handleCloseUpdateModal();
-                  }}
-                  className="min-h-[42px] px-5 text-sm font-medium text-[#2d3748]
-                    bg-gray-50 hover:bg-gray-100
-                    rounded-lg transition-colors duration-200"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleSubmitUpdate}
-                  disabled={isUpdating}
-                  className="min-h-[42px] px-5 text-sm font-medium text-white
-                    bg-[#1d5030] hover:bg-[#1d5030]/90
-                    rounded-lg transition-colors duration-200
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    flex items-center gap-2"
-                >
-                  {isUpdating ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Actualizando...
-                    </>
-                  ) : (
-                    "Guardar"
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        isClosing={isClosingUpdateModal}
+        editingProduct={editingProduct}
+        updateForm={updateForm}
+        setUpdateForm={setUpdateForm}
+        isUpdating={isUpdating}
+        onClose={handleCloseUpdateModal}
+        onSubmit={handleSubmitUpdate}
+      />
 
       {/* Modal de productos próximos a caducar */}
-      {isExpiringModalOpen && (
-        <div
-          className={`
-          fixed inset-0 z-50 flex items-center justify-center p-4
-          ${isClosingExpiringModal ? "animate-fade-out" : "animate-fade-in"}
-          `}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              handleCloseExpiringModal();
-            }
-          }}
-        >
-          {/* Fondo oscuro clickeable */}
-          <div
-            className="fixed inset-0 bg-black/50 transition-opacity"
-            onClick={handleCloseExpiringModal}
-          />
-
-          {/* Contenido del modal */}
-          <div
-            className={`
-              relative w-full max-w-md mx-auto bg-white rounded-2xl
-              min-h-[320px] max-h-[70vh] overflow-hidden z-10
-              ${
-                isClosingExpiringModal
-                  ? "animate-slide-out"
-                  : "animate-slide-down"
-              }
-              transform transition-all duration-300
-              shadow-xl
-            `}
-          >
-            {/* Header */}
-            <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
-              <div className="px-4 py-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-[#1d5030] select-none">
-                  Próximas Caducidades
-                </h2>
-                <button
-                  onClick={handleCloseExpiringModal}
-                  className="p-2 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
-                >
-                  <X className="w-6 h-6 text-gray-500" />
-                </button>
-              </div>
-            </div>
-
-            {/* Lista de productos agrupada */}
-            <div className="overflow-y-auto" data-scrollable>
-              {Object.entries(getGroupedExpiringProducts()).map(
-                ([key, { title, color, products }]) =>
-                  products.length > 0 && (
-                    <div key={key} className="mb-6 last:mb-0">
-                      {/* Header de sección */}
-                      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                        <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                          {title}
-                        </h3>
-                      </div>
-
-                      {/* Lista de productos */}
-                      <div className="divide-y divide-gray-100">
-                        {products
-                          .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
-                          .map((product) => (
-                            <div
-                              key={product.producto._id}
-                              onClick={() => navigateToProduct(product)}
-                              className={`
-                                w-full text-left 
-                                hover:bg-gray-50 active:bg-gray-100 
-                                transition-colors duration-200
-                                flex items-start gap-4 group
-                                p-4 cursor-pointer
-                                ${key === "expired" ? "bg-red-50" : ""} 
-                              `}
-                            >
-                              {/* Barra indicadora de urgencia */}
-                              <div
-                                className={`
-                                  w-1.5 self-stretch rounded-full
-                                  ${key === "expired" ? "animate-pulse" : ""}
-                                `}
-                                style={{ backgroundColor: color }}
-                              />
-
-                              {/* Información del producto */}
-                              <div className="flex-1 min-w-0">
-                                {/* Nombre y días */}
-                                <div className="flex items-start justify-between gap-3 mb-1">
-                                  <h4
-                                    className={`
-                                    font-semibold truncate group-hover:text-[#1d5030] 
-                                    transition-colors
-                                    ${
-                                      key === "expired"
-                                        ? "text-red-700"
-                                        : "text-[#2d3748]"
-                                    }
-                                  `}
-                                  >
-                                    {product.producto.nombre}
-                                  </h4>
-                                  <span
-                                    className="text-sm font-medium whitespace-nowrap"
-                                    style={{ color }}
-                                  >
-                                    {product.daysUntilExpiry < 0
-                                      ? `Caducado hace ${Math.abs(
-                                          product.daysUntilExpiry
-                                        )} ${
-                                          Math.abs(product.daysUntilExpiry) ===
-                                          1
-                                            ? "día"
-                                            : "días"
-                                        }`
-                                      : `${product.daysUntilExpiry} ${
-                                          product.daysUntilExpiry === 1
-                                            ? "día"
-                                            : "días"
-                                        }`}
-                                  </span>
-                                </div>
-
-                                {/* Fecha de caducidad */}
-                                <p
-                                  className={`
-                                  text-sm font-medium
-                                  ${
-                                    key === "expired"
-                                      ? "text-red-600"
-                                      : "text-[#1d5030]"
-                                  }
-                                `}
-                                >
-                                  {formatDate(product.fechaFrente)}
-                                </p>
-                              </div>
-
-                              {/* Indicador de acción */}
-                              <div
-                                className="text-gray-400 group-hover:text-[#1d5030] 
-                                transition-colors self-center"
-                              >
-                                <ChevronRight className="w-5 h-5" />
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )
-              )}
-              <div className="h-8" /> {/* Padding inferior aumentado */}
-            </div>
-          </div>
-        </div>
-      )}
+      <ExpiringModal
+        isOpen={isExpiringModalOpen}
+        isClosing={isClosingExpiringModal}
+        groupedProducts={getGroupedExpiringProducts()}
+        onClose={handleCloseExpiringModal}
+        onProductClick={navigateToProduct}
+      />
 
       {/* User Management Modal */}
       <UserManagement
