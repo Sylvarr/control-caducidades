@@ -5,7 +5,6 @@ const path = require("path");
 const http = require("http");
 const { Server } = require("socket.io");
 const rateLimit = require("express-rate-limit");
-const dotenv = require("dotenv");
 
 // Cargar variables de entorno según el entorno
 console.log("Directorio actual:", __dirname);

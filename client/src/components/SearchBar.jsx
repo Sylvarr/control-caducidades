@@ -15,11 +15,21 @@ function SearchBar({
           type="text"
           placeholder="Buscar producto..."
           value={searchTerm}
-          onChange={(e) => onSearchChange(e.target.value)}
+          onChange={(e) => {
+            const value = e.target.value;
+            // Solo permitir letras y espacios, máximo 15 caracteres
+            if (
+              /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]*$/.test(value) &&
+              value.length <= 15
+            ) {
+              onSearchChange(value);
+            }
+          }}
           className="w-full h-10 pl-9 pr-9 rounded-lg border-0 
             focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50 focus:border-transparent
             font-['Noto Sans'] text-sm font-medium placeholder:text-gray-400
             bg-white shadow-sm"
+          maxLength={15}
         />
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#1d5030] w-4 h-4" />
         {searchTerm && (

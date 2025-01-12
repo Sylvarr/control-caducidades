@@ -240,10 +240,20 @@ const CatalogManagement = ({ isOpen, onClose }) => {
                   type="text"
                   placeholder="Buscar producto..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Solo permitir letras y espacios, máximo 15 caracteres
+                    if (
+                      /^[a-zA-ZáéíóúüñÁÉÍÓÚÜÑ\s]*$/.test(value) &&
+                      value.length <= 15
+                    ) {
+                      setSearchTerm(value);
+                    }
+                  }}
                   className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md
                     focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50 focus:border-transparent
                     text-gray-900 placeholder-gray-500"
+                  maxLength={15}
                 />
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               </div>
