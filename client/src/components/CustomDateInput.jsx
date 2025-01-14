@@ -3,7 +3,16 @@ import PropTypes from "prop-types";
 import { X, Calendar, AlertCircle } from "lucide-react";
 import usePreventScroll from "../hooks/usePreventScroll";
 
-const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
+const CustomDateInput = ({
+  label,
+  value,
+  onChange,
+  disabled = false,
+  onRemove,
+  showRemoveWhenEmpty = false,
+  "data-date-input": dataDateInput,
+  onCancel,
+}) => {
   const [inputValue, setInputValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [error, setError] = useState("");
@@ -37,6 +46,9 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
         event.target.closest("[data-modal-backdrop]") // Solo cerrar si el click fue en el backdrop
       ) {
         setIsOpen(false);
+        if (!value && onCancel) {
+          onCancel();
+        }
       }
     };
 
@@ -44,7 +56,7 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isOpen]);
+  }, [isOpen, value, onCancel]);
 
   // Validar fecha y que no sea más de 5 años en el futuro
   const isValidDate = useCallback((day, month, year) => {
@@ -160,26 +172,53 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
   };
 
   // Manejar clic en número del teclado con debounce
+  const debouncedKeypadClick = useMemo(
+    () =>
+      debounce(
+        (
+          e,
+          num,
+          currentInputValue,
+          onSetInputValue,
+          onSetError,
+          onValidateAndUpdate
+        ) => {
+          e.stopPropagation();
+
+          // Si ya hay una fecha completa (10 caracteres), borrar todo y empezar de nuevo
+          if (currentInputValue.length === 10) {
+            onSetInputValue(num.toString());
+            onSetError("");
+            return;
+          }
+
+          if (currentInputValue.length < 10) {
+            const newValue = formatInput(
+              currentInputValue.replace(/\D/g, "") + num
+            );
+            onSetInputValue(newValue);
+            if (newValue.length === 10) {
+              onValidateAndUpdate(newValue);
+            }
+          }
+        },
+        50
+      ),
+    [formatInput]
+  );
+
   const handleKeypadClick = useCallback(
-    debounce((e, num) => {
-      e.stopPropagation();
-
-      // Si ya hay una fecha completa (10 caracteres), borrar todo y empezar de nuevo
-      if (inputValue.length === 10) {
-        setInputValue(num.toString());
-        setError("");
-        return;
-      }
-
-      if (inputValue.length < 10) {
-        const newValue = formatInput(inputValue.replace(/\D/g, "") + num);
-        setInputValue(newValue);
-        if (newValue.length === 10) {
-          validateAndUpdate(newValue);
-        }
-      }
-    }, 50),
-    [inputValue, formatInput, validateAndUpdate]
+    (e, num) => {
+      debouncedKeypadClick(
+        e,
+        num,
+        inputValue,
+        setInputValue,
+        setError,
+        validateAndUpdate
+      );
+    },
+    [debouncedKeypadClick, inputValue, validateAndUpdate]
   );
 
   // Manejar borrado
@@ -274,6 +313,7 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
           type="button"
           onClick={() => !disabled && setIsOpen(true)}
           disabled={disabled}
+          data-date-input={dataDateInput}
           className={`
             flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg w-full
             font-medium text-sm transition-all duration-200
@@ -292,13 +332,15 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
             <span className="text-gray-500">Seleccionar {label}</span>
           )}
         </button>
-        {value && !disabled && (
+        {((value && !disabled) ||
+          (!value && showRemoveWhenEmpty && onRemove)) && (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              onChange("");
-              setInputValue("");
+              if (onRemove) {
+                onRemove();
+              }
             }}
             className="p-2.5 text-gray-400 hover:text-gray-600
               hover:bg-gray-100 rounded-lg transition-colors"
@@ -314,7 +356,12 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
           <div
             data-modal-backdrop
             className="fixed inset-0 bg-black/50"
-            onClick={() => setIsOpen(false)}
+            onClick={() => {
+              setIsOpen(false);
+              if (!value && onCancel) {
+                onCancel();
+              }
+            }}
           />
           <div
             ref={modalRef}
@@ -333,6 +380,9 @@ const CustomDateInput = ({ label, value, onChange, disabled = false }) => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsOpen(false);
+                  if (!value && onCancel) {
+                    onCancel();
+                  }
                 }}
                 className="p-2 text-gray-400 hover:text-gray-600
                   hover:bg-gray-100 rounded-full transition-colors"
@@ -419,6 +469,10 @@ CustomDateInput.propTypes = {
   value: PropTypes.string,
   onChange: PropTypes.func.isRequired,
   disabled: PropTypes.bool,
+  onRemove: PropTypes.func,
+  showRemoveWhenEmpty: PropTypes.bool,
+  "data-date-input": PropTypes.string,
+  onCancel: PropTypes.func,
 };
 
 export default CustomDateInput;

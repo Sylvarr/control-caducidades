@@ -1,6 +1,5 @@
 const CatalogProduct = require("../models/CatalogProduct");
 const ProductStatus = require("../models/Product");
-const mongoose = require("mongoose");
 const { io } = require("../index");
 
 // Obtener todos los productos del catálogo

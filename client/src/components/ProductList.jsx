@@ -38,8 +38,11 @@ const ProductList = () => {
   const [updateForm, setUpdateForm] = useState({
     fechaFrente: "",
     fechaAlmacen: "",
+    fechaAlmacen2: "",
+    fechaAlmacen3: "",
     cajaUnica: false,
-    hayOtrasFechas: false,
+    showSecondDate: false,
+    showThirdDate: false,
     noHayEnAlmacen: false,
   });
 
@@ -52,8 +55,11 @@ const ProductList = () => {
     loadAllProducts,
     handleUpdateProduct,
     handleDeleteProduct,
+    handleUndoDelete,
     filterProducts,
-  } = useProductManagement((message, type) => addToast(message, type));
+  } = useProductManagement((message, type, data) =>
+    addToast(message, type, data)
+  );
 
   const {
     isUpdateModalOpen,
@@ -121,22 +127,31 @@ const ProductList = () => {
       e?.stopPropagation();
       setEditingProduct(product);
 
-      const defaultDate = product.fechaFrente
-        ? new Date(product.fechaFrente).toISOString().split("T")[0]
-        : `${new Date().getFullYear()}-MM-DD`;
+      // Extraer fechas adicionales si existen
+      const fechas = product.fechasAlmacen || [];
+      const [primeraFecha, segundaFecha, terceraFecha] = fechas;
 
       setUpdateForm({
         fechaFrente: product.fechaFrente
           ? new Date(product.fechaFrente).toISOString().split("T")[0]
-          : defaultDate,
+          : "",
         fechaAlmacen:
           product.estado === "frente-agota"
             ? ""
+            : primeraFecha
+            ? new Date(primeraFecha).toISOString().split("T")[0]
             : product.fechaAlmacen
             ? new Date(product.fechaAlmacen).toISOString().split("T")[0]
-            : defaultDate,
+            : "",
+        fechaAlmacen2: segundaFecha
+          ? new Date(segundaFecha).toISOString().split("T")[0]
+          : "",
+        fechaAlmacen3: terceraFecha
+          ? new Date(terceraFecha).toISOString().split("T")[0]
+          : "",
         cajaUnica: product.cajaUnica || false,
-        hayOtrasFechas: product.hayOtrasFechas || false,
+        showSecondDate: Boolean(segundaFecha),
+        showThirdDate: Boolean(terceraFecha),
         noHayEnAlmacen: product.estado === "frente-agota",
       });
 
@@ -159,13 +174,27 @@ const ProductList = () => {
         return;
       }
 
+      // Preparar array de fechas de almacén
+      const fechasAlmacen = [];
+      if (!updateForm.noHayEnAlmacen) {
+        if (updateForm.fechaAlmacen) {
+          fechasAlmacen.push(updateForm.fechaAlmacen);
+        }
+        if (updateForm.showSecondDate && updateForm.fechaAlmacen2) {
+          fechasAlmacen.push(updateForm.fechaAlmacen2);
+        }
+        if (updateForm.showThirdDate && updateForm.fechaAlmacen3) {
+          fechasAlmacen.push(updateForm.fechaAlmacen3);
+        }
+      }
+
       const updateData = {
         fechaFrente: updateForm.fechaFrente,
         fechaAlmacen: updateForm.noHayEnAlmacen
           ? null
           : updateForm.fechaAlmacen || null,
+        fechasAlmacen: updateForm.noHayEnAlmacen ? [] : fechasAlmacen,
         cajaUnica: Boolean(updateForm.cajaUnica),
-        hayOtrasFechas: Boolean(updateForm.hayOtrasFechas),
         estado: updateForm.noHayEnAlmacen ? "frente-agota" : "frente-cambia",
       };
 
@@ -297,7 +326,11 @@ const ProductList = () => {
       onRetry={loadAllProducts}
     >
       <div className="max-w-md mx-auto p-4 bg-[#f8f8f8]">
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
+        <ToastContainer
+          toasts={toasts}
+          removeToast={removeToast}
+          onUndo={handleUndoDelete}
+        />
 
         <HeaderSection
           user={authUser}

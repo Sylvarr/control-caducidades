@@ -3,9 +3,12 @@ import { useState, useCallback } from "react";
 const useToasts = () => {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = "info") => {
+  const addToast = useCallback((message, type = "info", data = {}) => {
     const id = Date.now();
-    setToasts((currentToasts) => [...currentToasts, { id, message, type }]);
+    setToasts((currentToasts) => [
+      ...currentToasts,
+      { id, message, type, ...data },
+    ]);
   }, []);
 
   const removeToast = useCallback((id) => {

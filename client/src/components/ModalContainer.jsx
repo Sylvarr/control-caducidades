@@ -15,26 +15,27 @@ const ModalContainer = ({
   return (
     <div
       className={`
-        fixed inset-0 z-50 flex items-start justify-center pt-20
+        fixed inset-0 z-50 flex items-center justify-center
         ${isClosing ? "animate-fade-out" : "animate-fade-in"}
       `}
       onClick={onClose}
+      data-modal-backdrop
     >
       <div className="fixed inset-0 bg-black/50 transition-opacity duration-300" />
       <div
         className={`
           relative w-full max-w-md mx-4
           bg-white rounded-lg shadow-xl
-          max-h-[calc(100vh-8rem)] flex flex-col z-10
+          min-h-[200px] max-h-[90vh]
+          flex flex-col z-10
           ${isClosing ? "animate-slide-up" : "animate-slide-down"}
           transition-all duration-300 ease-out
-          overflow-hidden
           ${containerClassName}
         `}
         onClick={(e) => e.stopPropagation()}
       >
         {showHeader && (
-          <div className="flex-none sticky top-0 z-10 bg-white border-b border-gray-200">
+          <div className="flex-none sticky top-0 z-10 bg-white rounded-t-lg border-b border-gray-200">
             <div className="px-4 py-3 flex items-center justify-between">
               <h2 className="text-lg font-bold text-[#1d5030]">{title}</h2>
               <button
@@ -46,7 +47,9 @@ const ModalContainer = ({
             </div>
           </div>
         )}
-        {children}
+        <div className="flex-1 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
       </div>
     </div>
   );

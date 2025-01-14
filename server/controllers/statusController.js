@@ -35,10 +35,24 @@ exports.updateStatus = async (req, res) => {
     });
 
     const { productoId } = req.params;
+    const {
+      fechaFrente,
+      fechaAlmacen,
+      fechasAlmacen = [],
+      cajaUnica,
+    } = req.body;
+
+    console.log("Fecha Frente recibida:", fechaFrente);
+
+    // Preparar los datos de actualización
     const updateData = {
-      ...req.body,
-      estado: "sin-clasificar", // Aseguramos que tenga un estado inicial
+      fechaFrente,
+      fechaAlmacen,
+      fechasAlmacen,
+      cajaUnica: Boolean(cajaUnica),
     };
+
+    console.log("Datos de actualización preparados:", updateData);
 
     // Buscar si ya existe un estado para este producto
     let productStatus = await ProductStatus.findOne({ producto: productoId });
@@ -46,7 +60,6 @@ exports.updateStatus = async (req, res) => {
     if (productStatus) {
       console.log("Estado actual encontrado:", productStatus);
       // Actualizar estado existente
-      console.log("Actualizando estado existente con:", updateData);
       Object.assign(productStatus, updateData);
     } else {
       // Crear nuevo estado
@@ -93,10 +106,9 @@ exports.updateStatus = async (req, res) => {
     }
   } catch (error) {
     console.error("Error en updateStatus:", error);
-    res.status(400).json({
-      message: "Error al actualizar estado",
+    res.status(500).json({
+      message: "Error al actualizar el estado",
       error: error.message,
-      stack: error.stack,
     });
   }
 };

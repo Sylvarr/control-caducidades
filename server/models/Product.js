@@ -15,11 +15,11 @@ const productStatusSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    cajaUnica: {
-      type: Boolean,
-      default: false,
+    fechasAlmacen: {
+      type: [Date],
+      default: [],
     },
-    hayOtrasFechas: {
+    cajaUnica: {
       type: Boolean,
       default: false,
     },
@@ -45,8 +45,8 @@ productStatusSchema.pre("save", function (next) {
   console.log("Pre-save middleware ejecutándose con datos:", {
     fechaFrente: this.fechaFrente,
     fechaAlmacen: this.fechaAlmacen,
+    fechasAlmacen: this.fechasAlmacen,
     cajaUnica: this.cajaUnica,
-    hayOtrasFechas: this.hayOtrasFechas,
     estado: this.estado,
   });
 
@@ -58,27 +58,26 @@ productStatusSchema.pre("save", function (next) {
       return next();
     }
 
+    // Convertir fechas a timestamps para comparación
+    const frontDate = new Date(this.fechaFrente).setHours(0, 0, 0, 0);
+    const storageDate = new Date(this.fechaAlmacen).setHours(0, 0, 0, 0);
+
     // Si las fechas son diferentes, es "frente-cambia"
-    if (this.fechaFrente.getTime() !== this.fechaAlmacen.getTime()) {
+    if (frontDate !== storageDate) {
       console.log("Estableciendo estado: frente-cambia (fechas diferentes)");
       this.estado = "frente-cambia";
       return next();
     }
 
     // Si las fechas coinciden
-    if (this.fechaFrente.getTime() === this.fechaAlmacen.getTime()) {
+    if (frontDate === storageDate) {
       if (this.cajaUnica) {
-        // Si es la última caja y las fechas coinciden
-        console.log(
-          "Estableciendo estado: abierto-agota (fechas iguales y última caja)"
-        );
+        console.log("Estableciendo estado: abierto-agota (última caja)");
         this.estado = "abierto-agota";
-      } else if (this.hayOtrasFechas) {
-        // Si hay otras fechas pero no es la última caja
+      } else if (this.fechasAlmacen && this.fechasAlmacen.length > 0) {
         console.log("Estableciendo estado: abierto-cambia (hay otras fechas)");
         this.estado = "abierto-cambia";
       } else {
-        // Si las fechas coinciden pero no es última caja ni hay otras fechas
         console.log(
           "Estableciendo estado: sin-clasificar (fechas iguales, sin condiciones especiales)"
         );
