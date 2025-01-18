@@ -1,7 +1,7 @@
 import { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import { AuthContext } from "../App";
+import AuthContext from "../contexts/AuthContext";
 import config from "../config";
 
 const Login = () => {

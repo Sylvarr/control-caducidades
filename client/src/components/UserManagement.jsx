@@ -4,6 +4,7 @@ import PropTypes from "prop-types";
 import config from "../config";
 import usePreventScroll from "../hooks/usePreventScroll";
 import ModalContainer from "./ModalContainer";
+import { useSocket } from "../hooks/useSocket";
 
 const UserManagement = ({
   isOpen = false,
@@ -12,6 +13,7 @@ const UserManagement = ({
 }) => {
   // Usar el hook para prevenir scroll
   usePreventScroll(isOpen);
+  const { socket } = useSocket();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +57,47 @@ const UserManagement = ({
       loadUsers();
     }
   }, [isOpen, loadUsers]);
+
+  // Escuchar eventos de socket para actualizaciones de usuarios
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUserUpdate = (data) => {
+      console.log("Recibida actualización de usuario:", data);
+
+      if (data.type === "create") {
+        setUsers((prevUsers) => [
+          ...prevUsers,
+          {
+            ...data.user,
+            _id: data.user.id,
+          },
+        ]);
+      } else if (data.type === "update") {
+        setUsers((prevUsers) =>
+          prevUsers.map((user) =>
+            user._id === data.user.id
+              ? {
+                  ...user,
+                  ...data.user,
+                  _id: data.user.id,
+                }
+              : user
+          )
+        );
+      } else if (data.type === "delete") {
+        setUsers((prevUsers) =>
+          prevUsers.filter((user) => user._id !== data.userId)
+        );
+      }
+    };
+
+    socket.on("userUpdate", handleUserUpdate);
+
+    return () => {
+      socket.off("userUpdate", handleUserUpdate);
+    };
+  }, [socket]);
 
   // Validación en tiempo real
   const validateForm = useCallback((data) => {

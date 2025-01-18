@@ -1,6 +1,6 @@
 import { LogOut, Users, Package, CloudOff } from "lucide-react";
 import PropTypes from "prop-types";
-import { useSyncContext } from "../contexts/SyncContext";
+import { useSyncContext } from "../hooks/useSyncContext";
 
 const HeaderSection = ({
   user,

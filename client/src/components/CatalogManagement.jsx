@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import PropTypes from "prop-types";
 import CreateProductModal from "./CreateProductModal";
-import { useSocket } from "../contexts/SocketContext";
+import { useSocket } from "../hooks/useSocket";
 import OfflineManager from "../services/offlineManager";
 import usePreventScroll from "../hooks/usePreventScroll";
 

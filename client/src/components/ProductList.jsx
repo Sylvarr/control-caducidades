@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthContext } from "../App";
+import AuthContext from "../contexts/AuthContext";
 import ToastContainer from "./ToastContainer";
 import UserManagement from "./UserManagement";
 import CatalogManagement from "./CatalogManagement";
-import { useSocket } from "../contexts/SocketContext";
+import { useSocket } from "../hooks/useSocket";
 import usePreventScroll from "../hooks/usePreventScroll";
 import useToasts from "../hooks/useToasts";
 import SearchBar from "./SearchBar";

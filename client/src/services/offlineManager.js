@@ -118,7 +118,7 @@ class OfflineManager {
 
       // Modo offline - Combinar datos existentes con nuevos datos
       const productToSave = {
-        ...(currentStatus || {}), // Mantener datos existentes si los hay
+        ...currentStatus,
         producto: catalogProduct,
         ...processedData, // Sobrescribir con nuevos datos
         updatedAt: new Date().toISOString(),
