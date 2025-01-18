@@ -139,9 +139,9 @@ app.use((req, res, next) => {
 // Configurar rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // Límite de 100 solicitudes por ventana por IP
-  standardHeaders: true, // Devolver info de rate limit en los headers `RateLimit-*`
-  legacyHeaders: false, // Deshabilitar los headers `X-RateLimit-*`
+  max: 1000, // Límite de 1000 solicitudes por ventana por IP
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     error: "Demasiadas solicitudes, por favor intente más tarde.",
     details: "Se ha excedido el límite de solicitudes permitidas.",
