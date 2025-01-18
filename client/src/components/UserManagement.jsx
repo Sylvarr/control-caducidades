@@ -22,7 +22,6 @@ const UserManagement = ({
     username: "",
     password: "",
     role: "encargado",
-    restaurante: "Restaurante",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
@@ -138,7 +137,6 @@ const UserManagement = ({
         username: "",
         password: "",
         role: "encargado",
-        restaurante: "Restaurante",
       });
       setError(null);
     } catch (err) {
@@ -182,7 +180,6 @@ const UserManagement = ({
       username: "",
       password: "",
       role: "encargado",
-      restaurante: "Restaurante",
     });
     setFormErrors({});
     onClose();
@@ -331,27 +328,6 @@ const UserManagement = ({
               </select>
             </div>
 
-            {/* Restaurant field */}
-            <div className="mb-4">
-              <label
-                htmlFor="restaurante"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Restaurante
-              </label>
-              <select
-                id="restaurante"
-                name="restaurante"
-                value={formData.restaurante}
-                onChange={handleInputChange}
-                className="w-full p-2 border border-gray-300 rounded-md
-                  focus:outline-none focus:ring-2 focus:ring-[#1d5030] focus:ring-opacity-50"
-              >
-                <option value="Restaurante">Restaurante</option>
-                <option value="Cafetería">Cafetería</option>
-              </select>
-            </div>
-
             {/* Form buttons */}
             <div className="flex justify-end gap-3">
               <button
@@ -362,7 +338,6 @@ const UserManagement = ({
                     username: "",
                     password: "",
                     role: "encargado",
-                    restaurante: "Restaurante",
                   });
                   setFormErrors({});
                 }}
@@ -413,8 +388,7 @@ const UserManagement = ({
                     {user.username}
                   </h4>
                   <p className="text-sm text-gray-500">
-                    {user.role === "admin" ? "Administrador" : "Encargado"} -{" "}
-                    {user.restaurante}
+                    {user.role === "admin" ? "Administrador" : "Encargado"}
                   </p>
                 </div>
 

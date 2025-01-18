@@ -1,5 +1,6 @@
-import { LogOut, Users, Package } from "lucide-react";
+import { LogOut, Users, Package, CloudOff } from "lucide-react";
 import PropTypes from "prop-types";
+import { useSyncContext } from "../contexts/SyncContext";
 
 const HeaderSection = ({
   user,
@@ -10,18 +11,30 @@ const HeaderSection = ({
   onCatalogManagementClick,
   onExpiringClick,
 }) => {
+  const { pendingChanges } = useSyncContext();
+
   return (
     <div className="flex flex-col items-center justify-center gap-1 mb-8">
       {/* Información del usuario y botones */}
       <div className="flex items-center gap-3 text-sm text-gray-500 font-medium mb-3">
-        <span className="select-none">
-          {user?.username} ·{" "}
-          {user?.role === "supervisor"
-            ? "Supervisor"
-            : user?.role === "encargado"
-            ? "Encargado"
-            : "Gerente"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="select-none">
+            {user?.username} ·{" "}
+            {user?.role === "supervisor"
+              ? "Supervisor"
+              : user?.role === "encargado"
+              ? "Encargado"
+              : "Gerente"}
+          </span>
+          <div className="flex items-center gap-2">
+            {pendingChanges > 0 && (
+              <div className="flex items-center gap-1 text-gray-600">
+                <CloudOff size={20} />
+                <span>{pendingChanges}</span>
+              </div>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           {user?.role === "supervisor" && (
             <>

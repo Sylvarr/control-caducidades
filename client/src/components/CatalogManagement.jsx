@@ -11,7 +11,7 @@ import {
 import PropTypes from "prop-types";
 import CreateProductModal from "./CreateProductModal";
 import { useSocket } from "../contexts/SocketContext";
-import { getAllCatalogProducts, deleteProduct } from "../services/api";
+import OfflineManager from "../services/offlineManager";
 import usePreventScroll from "../hooks/usePreventScroll";
 
 const TYPE_STYLES = {
@@ -55,7 +55,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       console.log("Intentando cargar productos...");
-      const data = await getAllCatalogProducts();
+      const data = await OfflineManager.getAllCatalogProducts();
       console.log("Datos recibidos:", data);
       setProducts(data);
       setError(null);
@@ -79,7 +79,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
       setLoading(true);
       console.log("Intentando eliminar producto:", productId);
 
-      await deleteProduct(productId);
+      await OfflineManager.deleteCatalogProduct(productId);
       await loadProducts();
       setDeleteConfirm(null);
       setError(null);
@@ -160,28 +160,17 @@ const CatalogManagement = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on("catalogUpdate", (data) => {
+    const handleCatalogUpdate = async (data) => {
       console.log("Recibida actualización de catálogo:", data);
+      await loadProducts(); // Recargar todos los productos en lugar de manipular el estado directamente
+    };
 
-      if (data.type === "create") {
-        setProducts((prevProducts) => [...prevProducts, data.product]);
-      } else if (data.type === "update") {
-        setProducts((prevProducts) =>
-          prevProducts.map((p) =>
-            p._id === data.product._id ? data.product : p
-          )
-        );
-      } else if (data.type === "delete") {
-        setProducts((prevProducts) =>
-          prevProducts.filter((p) => p._id !== data.productId)
-        );
-      }
-    });
+    socket.on("catalogUpdate", handleCatalogUpdate);
 
     return () => {
-      socket.off("catalogUpdate");
+      socket.off("catalogUpdate", handleCatalogUpdate);
     };
-  }, [socket]);
+  }, [socket, loadProducts]);
 
   if (!isOpen) return null;
 
@@ -333,5 +322,4 @@ CatalogManagement.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
 };
-
 export default CatalogManagement;

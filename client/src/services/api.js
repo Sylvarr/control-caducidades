@@ -1,3 +1,6 @@
+import OfflineDebugger from "../utils/debugger";
+import OfflineManager from "./offlineManager";
+
 // API Base URL basada en el entorno
 const API_BASE_URL = import.meta.env.PROD
   ? `${window.location.origin}/api` // URL de producción
@@ -30,18 +33,33 @@ const getHeaders = (contentType = false) => {
 // Función auxiliar para manejar errores de la API
 const handleApiError = async (response) => {
   const contentType = response.headers.get("content-type");
-  if (contentType && contentType.includes("application/json")) {
-    const errorData = await response.json();
-    throw new Error(
-      errorData.error || errorData.message || "Error en la petición"
-    );
+  let errorMessage;
+
+  try {
+    if (contentType && contentType.includes("application/json")) {
+      const errorData = await response.json();
+      errorMessage =
+        errorData.error || errorData.message || "Error en la petición";
+    } else {
+      errorMessage = "Error en la petición";
+    }
+    // eslint-disable-next-line no-unused-vars
+  } catch (error) {
+    errorMessage = "Error al procesar la respuesta del servidor";
   }
-  throw new Error("Error en la petición");
+
+  OfflineDebugger.error("API_ERROR", new Error(errorMessage), {
+    status: response.status,
+    url: response.url,
+    contentType,
+  });
+
+  throw new Error(errorMessage);
 };
 
-// Obtener todos los estados de productos
-export const getAllProductStatus = async () => {
-  try {
+// Implementación de las operaciones HTTP directas
+const httpOperations = {
+  getAllProductStatus: async () => {
     const response = await fetch(`${API_BASE_URL}/status`, {
       headers: getHeaders(),
     });
@@ -51,17 +69,9 @@ export const getAllProductStatus = async () => {
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Error en getAllProductStatus:", error);
-    throw error;
-  }
-};
+  },
 
-// Actualizar estado de un producto
-export const updateProductStatus = async (productId, data) => {
-  try {
-    console.log(`Enviando actualización para producto ${productId}:`, data);
-
+  updateProductStatus: async (productId, data) => {
     const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
       method: "PUT",
       headers: getHeaders(true),
@@ -73,26 +83,25 @@ export const updateProductStatus = async (productId, data) => {
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Error en updateProductStatus:", error);
-    throw error;
-  }
-};
+  },
 
-// Obtener todos los productos del catálogo
-export const getAllCatalogProducts = async () => {
-  try {
-    console.log("Obteniendo productos del catálogo...");
-    console.log("Token disponible:", !!getAuthToken());
-
+  getAllCatalogProducts: async () => {
     const response = await fetch(`${API_BASE_URL}/catalog`, {
       headers: getHeaders(),
     });
 
-    console.log("Respuesta del servidor:", {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
+  createCatalogProduct: async (data) => {
+    const response = await fetch(`${API_BASE_URL}/catalog`, {
+      method: "POST",
+      headers: getHeaders(true),
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
@@ -100,17 +109,13 @@ export const getAllCatalogProducts = async () => {
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Error en getAllCatalogProducts:", error);
-    throw error;
-  }
-};
+  },
 
-export const deleteProductStatus = async (productId) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
-      method: "DELETE",
-      headers: getHeaders(),
+  updateCatalogProduct: async (productId, data) => {
+    const response = await fetch(`${API_BASE_URL}/catalog/${productId}`, {
+      method: "PUT",
+      headers: getHeaders(true),
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
@@ -118,15 +123,9 @@ export const deleteProductStatus = async (productId) => {
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Error en deleteProductStatus:", error);
-    throw error;
-  }
-};
+  },
 
-// Eliminar un producto del catálogo
-export const deleteProduct = async (productId) => {
-  try {
+  deleteCatalogProduct: async (productId) => {
     const response = await fetch(`${API_BASE_URL}/catalog/${productId}`, {
       method: "DELETE",
       headers: getHeaders(),
@@ -137,8 +136,45 @@ export const deleteProduct = async (productId) => {
     }
 
     return await response.json();
-  } catch (error) {
-    console.error("Error en deleteProduct:", error);
-    throw error;
-  }
+  },
+
+  deleteProductStatus: async (productId) => {
+    const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
+  deleteProduct: async (productId) => {
+    const response = await fetch(`${API_BASE_URL}/catalog/${productId}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
 };
+
+// Exportar las operaciones envueltas con el OfflineManager
+export const getAllProductStatus = () => OfflineManager.getAllProductStatus();
+export const updateProductStatus = (productId, data) =>
+  OfflineManager.updateProductStatus(productId, data);
+export const getAllCatalogProducts = () =>
+  OfflineManager.getAllCatalogProducts();
+export const deleteProductStatus = (productId) =>
+  OfflineManager.deleteProductStatus(productId);
+export const deleteProduct = (productId) =>
+  httpOperations.deleteProduct(productId);
+
+// Exportar las operaciones HTTP directas para uso interno
+export const http = httpOperations;

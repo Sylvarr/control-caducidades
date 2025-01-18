@@ -306,13 +306,24 @@ const ProductList = () => {
   useEffect(() => {
     if (!socket) return;
 
+    const handleUpdate = () => {
+      console.log("Recargando productos después de actualización");
+      loadAllProducts();
+    };
+
     socket.on("productStatusUpdate", (data) => {
       console.log("Recibida actualización de estado:", data);
-      loadAllProducts();
+      handleUpdate();
+    });
+
+    socket.on("catalogUpdate", (data) => {
+      console.log("Recibida actualización de catálogo en ProductList:", data);
+      handleUpdate();
     });
 
     return () => {
       socket.off("productStatusUpdate");
+      socket.off("catalogUpdate");
     };
   }, [socket, loadAllProducts]);
 
@@ -424,5 +435,4 @@ const ProductList = () => {
     </LoadingErrorContainer>
   );
 };
-
 export default ProductList;

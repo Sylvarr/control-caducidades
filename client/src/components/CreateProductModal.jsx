@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { PackagePlus, X, RefreshCw } from "lucide-react";
 import PropTypes from "prop-types";
 import usePreventScroll from "../hooks/usePreventScroll";
+import OfflineManager from "../services/offlineManager";
 
 const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
   // Usar el hook para prevenir scroll
@@ -55,23 +56,7 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
 
     try {
       setIsSubmitting(true);
-      const response = await fetch("http://localhost:5000/api/catalog", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${
-            localStorage.getItem("token") || sessionStorage.getItem("token")
-          }`,
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Error al crear producto");
-      }
-
+      await OfflineManager.createCatalogProduct(formData);
       await onProductCreated();
       handleClose();
     } catch (err) {

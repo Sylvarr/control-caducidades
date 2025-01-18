@@ -9,6 +9,7 @@ import PropTypes from "prop-types";
 import ProductList from "./components/ProductList";
 import Login from "./components/Login";
 import { SocketProvider } from "./contexts/SocketContext";
+import { SyncProvider } from "./contexts/SyncContext";
 
 // Crear contexto de autenticación
 export const AuthContext = createContext(null);
@@ -68,22 +69,24 @@ const App = () => {
   return (
     <AuthContext.Provider value={authContextValue}>
       <SocketProvider>
-        <Router>
-          <Routes>
-            <Route
-              path="/login"
-              element={isAuthenticated ? <Navigate to="/" /> : <Login />}
-            />
-            <Route
-              path="/"
-              element={
-                <PrivateRoute>
-                  <ProductList />
-                </PrivateRoute>
-              }
-            />
-          </Routes>
-        </Router>
+        <SyncProvider>
+          <Router>
+            <Routes>
+              <Route
+                path="/login"
+                element={isAuthenticated ? <Navigate to="/" /> : <Login />}
+              />
+              <Route
+                path="/"
+                element={
+                  <PrivateRoute>
+                    <ProductList />
+                  </PrivateRoute>
+                }
+              />
+            </Routes>
+          </Router>
+        </SyncProvider>
       </SocketProvider>
     </AuthContext.Provider>
   );
