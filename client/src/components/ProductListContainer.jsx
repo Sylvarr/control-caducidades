@@ -25,7 +25,7 @@ const ProductListContainer = ({
                 0,
                 15
               )}"`
-            : "No hay productos disponibles"}
+            : "Selecciona los artículos sin clasificar para gestionar sus caducidades."}
         </p>
       </div>
     );
@@ -62,7 +62,7 @@ ProductListContainer.propTypes = {
   onProductClick: PropTypes.func.isRequired,
   onUpdateClick: PropTypes.func.isRequired,
   onDeleteClick: PropTypes.func.isRequired,
-  searchTerm: PropTypes.string,
+  searchTerm: PropTypes.string.isRequired,
 };
 
 export default ProductListContainer;

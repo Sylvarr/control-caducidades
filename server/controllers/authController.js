@@ -170,12 +170,11 @@ exports.createUser = async (req, res) => {
     console.log("Datos recibidos:", { username, role, restaurante });
 
     // Validar entrada
-    if (!username || !password || !role || !restaurante) {
+    if (!username || !password || !role) {
       console.log("Campos faltantes:", {
         username: !username,
         password: !password,
         role: !role,
-        restaurante: !restaurante,
       });
       return res.status(400).json({
         error: "Todos los campos son requeridos",
@@ -183,7 +182,6 @@ exports.createUser = async (req, res) => {
           username: !username ? "Falta el nombre de usuario" : null,
           password: !password ? "Falta la contraseña" : null,
           role: !role ? "Falta el rol" : null,
-          restaurante: !restaurante ? "Falta el restaurante" : null,
         },
       });
     }
@@ -208,6 +206,19 @@ exports.createUser = async (req, res) => {
     try {
       await user.save();
       console.log("Usuario creado exitosamente:", user);
+
+      // Emitir evento de socket para la actualización
+      if (global.io) {
+        global.io.emit("userUpdate", {
+          type: "create",
+          user: {
+            id: user._id,
+            username: user.username,
+            role: user.role,
+            restaurante: user.restaurante,
+          },
+        });
+      }
 
       res.status(201).json({
         message: "Usuario creado correctamente",
@@ -263,6 +274,18 @@ exports.updateUser = async (req, res) => {
     user.role = role;
     await user.save();
 
+    // Emitir evento de socket para la actualización
+    if (global.io) {
+      global.io.emit("userUpdate", {
+        type: "update",
+        user: {
+          id: user._id,
+          username: user.username,
+          role: user.role,
+        },
+      });
+    }
+
     res.json({
       message: "Usuario actualizado correctamente",
       user: {
@@ -303,6 +326,14 @@ exports.deleteUser = async (req, res) => {
     }
 
     await user.deleteOne();
+
+    // Emitir evento de socket para la actualización
+    if (global.io) {
+      global.io.emit("userUpdate", {
+        type: "delete",
+        userId: userId,
+      });
+    }
 
     res.json({
       message: "Usuario eliminado correctamente",

@@ -3,7 +3,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const path = require("path");
 const http = require("http");
-const { Server } = require("socket.io");
+const { setupSocket } = require("./socket");
 const rateLimit = require("express-rate-limit");
 
 // Cargar variables de entorno según el entorno
@@ -96,20 +96,8 @@ const corsOptions = {
 // Aplicar CORS como primer middleware
 app.use(cors(corsOptions));
 
-// Configuración de Socket.IO con las mismas opciones CORS
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    credentials: true,
-    allowedHeaders: ["Content-Type", "Authorization"],
-  },
-  allowEIO3: true,
-  transports: ["websocket", "polling"],
-});
-
-// Hacer io accesible globalmente
-global.io = io;
+// Configurar Socket.IO
+setupSocket(server, allowedOrigins);
 
 // Middleware
 app.use(express.json());
@@ -222,25 +210,6 @@ app.use((req, res) => {
   res.status(404).json({ error: "Ruta no encontrada" });
 });
 
-// Configuración de WebSocket
-io.on("connection", (socket) => {
-  console.log("Cliente conectado");
-
-  socket.on("productStatusUpdate", (data) => {
-    console.log("Actualización de estado recibida:", data);
-    io.emit("productStatusUpdate", data);
-  });
-
-  socket.on("catalogUpdate", (data) => {
-    console.log("Actualización de catálogo recibida:", data);
-    io.emit("catalogUpdate", data);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Cliente desconectado");
-  });
-});
-
 // Conexión a MongoDB con retry
 const connectWithRetry = async () => {
   const maxRetries = 5;
@@ -252,10 +221,7 @@ const connectWithRetry = async () => {
       console.log("MONGODB_URI disponible:", !!process.env.MONGODB_URI);
       console.log("NODE_ENV:", process.env.NODE_ENV);
 
-      await mongoose.connect(process.env.MONGODB_URI, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
+      await mongoose.connect(process.env.MONGODB_URI);
 
       console.log("Conectado a MongoDB exitosamente");
       console.log("Base de datos:", mongoose.connection.name);

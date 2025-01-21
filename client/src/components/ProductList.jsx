@@ -57,6 +57,9 @@ const ProductList = () => {
     handleDeleteProduct,
     handleUndoDelete,
     filterProducts,
+    updateProductInState,
+    removeProductFromState,
+    addProductToState,
   } = useProductManagement((message, type, data) =>
     addToast(message, type, data)
   );
@@ -306,26 +309,36 @@ const ProductList = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleUpdate = () => {
-      console.log("Recargando productos después de actualización");
-      loadAllProducts();
+    const handleProductStatusUpdate = (data) => {
+      console.log("Recibida actualización de estado:", data);
+      if (data.type === "update" || data.type === "create") {
+        updateProductInState(data.productStatus);
+      } else if (data.type === "delete") {
+        removeProductFromState(data.productId);
+      }
     };
 
-    socket.on("productStatusUpdate", (data) => {
-      console.log("Recibida actualización de estado:", data);
-      handleUpdate();
-    });
-
-    socket.on("catalogUpdate", (data) => {
+    const handleCatalogUpdate = (data) => {
       console.log("Recibida actualización de catálogo en ProductList:", data);
-      handleUpdate();
-    });
+      if (data.type === "create" || data.type === "update") {
+        // Para creaciones y actualizaciones, añadimos el producto como sin clasificar
+        addProductToState({
+          producto: data.product,
+          estado: "sin-clasificar",
+        });
+      } else if (data.type === "delete") {
+        removeProductFromState(data.productId);
+      }
+    };
+
+    socket.on("productStatusUpdate", handleProductStatusUpdate);
+    socket.on("catalogUpdate", handleCatalogUpdate);
 
     return () => {
-      socket.off("productStatusUpdate");
-      socket.off("catalogUpdate");
+      socket.off("productStatusUpdate", handleProductStatusUpdate);
+      socket.off("catalogUpdate", handleCatalogUpdate);
     };
-  }, [socket, loadAllProducts]);
+  }, [socket, updateProductInState, removeProductFromState, addProductToState]);
 
   const groupedProducts = getGroupedExpiringProducts();
   const hasExpiredProducts = groupedProducts.expired.products.length > 0;
@@ -426,10 +439,7 @@ const ProductList = () => {
 
         <CatalogManagement
           isOpen={showCatalogManagement}
-          onClose={() => {
-            setShowCatalogManagement(false);
-            loadAllProducts();
-          }}
+          onClose={() => setShowCatalogManagement(false)}
         />
       </div>
     </LoadingErrorContainer>

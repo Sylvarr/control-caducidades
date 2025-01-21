@@ -39,7 +39,6 @@ const userSchema = new mongoose.Schema(
     },
     restaurante: {
       type: String,
-      required: [true, "El restaurante es obligatorio"],
       trim: true,
     },
   },

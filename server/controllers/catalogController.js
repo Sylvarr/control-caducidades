@@ -1,6 +1,5 @@
 const CatalogProduct = require("../models/CatalogProduct");
 const ProductStatus = require("../models/Product");
-const { io } = require("../index");
 
 // Obtener todos los productos del catálogo
 exports.getAllProducts = async (req, res) => {
@@ -86,11 +85,13 @@ exports.toggleProductStatus = async (req, res) => {
     product.activo = !product.activo;
     const updatedProduct = await product.save();
 
-    // Emitir evento de actualización
-    io.emit("catalogUpdate", {
-      type: "update",
-      product: updatedProduct,
-    });
+    // Emitir evento de actualización usando la instancia global
+    if (global.io) {
+      global.io.emit("catalogUpdate", {
+        type: "update",
+        product: updatedProduct,
+      });
+    }
 
     res.json(updatedProduct);
   } catch (error) {

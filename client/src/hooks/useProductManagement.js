@@ -64,9 +64,57 @@ export const useProductManagement = (addToast) => {
     }
   }, []);
 
+  const updateProductInState = useCallback((productData) => {
+    setProducts((prevProducts) => {
+      const newProducts = Object.entries(prevProducts).reduce(
+        (acc, [category, productList]) => {
+          acc[category] = productList.filter(
+            (p) => p.producto._id !== productData.producto._id
+          );
+          return acc;
+        },
+        { ...prevProducts }
+      );
+
+      const category = productData.estado || "sin-clasificar";
+      newProducts[category] = [...newProducts[category], productData];
+
+      return newProducts;
+    });
+
+    setLastUpdatedProductId(productData.producto._id);
+    setTimeout(() => setLastUpdatedProductId(null), 3000);
+  }, []);
+
+  const removeProductFromState = useCallback((productId) => {
+    setProducts((prevProducts) => {
+      return Object.entries(prevProducts).reduce(
+        (acc, [category, productList]) => {
+          acc[category] = productList.filter(
+            (p) => p.producto._id !== productId
+          );
+          return acc;
+        },
+        { ...prevProducts }
+      );
+    });
+  }, []);
+
+  const addProductToState = useCallback((productData) => {
+    setProducts((prevProducts) => {
+      const category = productData.estado || "sin-clasificar";
+      return {
+        ...prevProducts,
+        [category]: [...prevProducts[category], productData],
+      };
+    });
+
+    setLastUpdatedProductId(productData.producto._id);
+    setTimeout(() => setLastUpdatedProductId(null), 3000);
+  }, []);
+
   const handleUpdateProduct = async (productId, updateData) => {
     try {
-      // Encontrar el producto antes de actualizarlo
       const productToUpdate = Object.values(products)
         .flat()
         .find((p) => p.producto._id === productId);
@@ -75,14 +123,8 @@ export const useProductManagement = (addToast) => {
         throw new Error("Producto no encontrado");
       }
 
-      await updateProductStatus(productId, updateData);
-      await loadAllProducts();
-      setLastUpdatedProductId(productId);
-
-      // Limpiar el resaltado después de 3 segundos
-      setTimeout(() => {
-        setLastUpdatedProductId(null);
-      }, 3000);
+      const updatedProduct = await updateProductStatus(productId, updateData);
+      updateProductInState(updatedProduct);
 
       addToast(
         `${productToUpdate.producto.nombre} actualizado correctamente.`,
@@ -97,7 +139,6 @@ export const useProductManagement = (addToast) => {
 
   const handleDeleteProduct = async (productId) => {
     try {
-      // Guardar el estado actual del producto antes de eliminarlo
       const productToDelete = Object.values(products)
         .flat()
         .find((p) => p.producto._id === productId);
@@ -106,24 +147,27 @@ export const useProductManagement = (addToast) => {
         throw new Error("Producto no encontrado");
       }
 
-      console.log("Guardando producto antes de eliminar:", {
-        producto: productToDelete,
-        id: productToDelete.producto._id,
-      });
-
-      // Guardar una copia del producto para evitar referencias
       setLastDeletedProduct({
         ...productToDelete,
         producto: { ...productToDelete.producto },
       });
 
       await deleteProductStatus(productId);
-      await loadAllProducts();
+      removeProductFromState(productId);
+
+      const unclassifiedProduct = {
+        producto: productToDelete.producto,
+        estado: "sin-clasificar",
+        fechaFrente: null,
+        fechaAlmacen: null,
+        fechasAlmacen: [],
+        cajaUnica: false,
+      };
+      addProductToState(unclassifiedProduct);
 
       const toastData = {
         productId: productToDelete.producto._id,
       };
-      console.log("Enviando datos al toast:", toastData);
 
       addToast(
         `${productToDelete.producto.nombre} desclasificado correctamente.`,
@@ -219,5 +263,8 @@ export const useProductManagement = (addToast) => {
     handleDeleteProduct,
     handleUndoDelete,
     filterProducts,
+    updateProductInState,
+    removeProductFromState,
+    addProductToState,
   };
 };

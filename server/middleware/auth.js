@@ -76,7 +76,7 @@ exports.isSupervisor = (req, res, next) => {
 };
 
 // Middleware de manejo de errores
-exports.errorHandler = (err, req, res, next) => {
+exports.errorHandler = (err, req, res, _next) => {
   console.error(err.stack);
 
   if (err.name === "ValidationError") {
