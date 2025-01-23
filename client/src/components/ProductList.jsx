@@ -19,6 +19,7 @@ import { useProductManagement } from "../hooks/useProductManagement";
 import { useModalManagement } from "../hooks/useModalManagement";
 import { useExpiringProducts } from "../hooks/useExpiringProducts";
 import { isExpiringSoon } from "../utils/dateUtils";
+import { classifyProduct } from "@shared/business/productClassifier";
 
 const ProductList = () => {
   const navigate = useNavigate();
@@ -163,21 +164,11 @@ const ProductList = () => {
     [setIsUpdateModalOpen]
   );
 
-  const handleSubmitUpdate = async () => {
+  const handleSubmitUpdate = async (e) => {
+    e.preventDefault();
+    setIsUpdating(true);
+
     try {
-      setIsUpdating(true);
-
-      if (!editingProduct) {
-        addToast("No hay producto seleccionado.", "error");
-        return;
-      }
-
-      if (!updateForm.fechaFrente) {
-        addToast("La fecha de frente es obligatoria.", "error");
-        return;
-      }
-
-      // Preparar array de fechas de almacén
       const fechasAlmacen = [];
       if (!updateForm.noHayEnAlmacen) {
         if (updateForm.fechaAlmacen) {
@@ -191,42 +182,32 @@ const ProductList = () => {
         }
       }
 
-      const updateData = {
+      const productData = {
         fechaFrente: updateForm.fechaFrente,
         fechaAlmacen: updateForm.noHayEnAlmacen
           ? null
-          : updateForm.fechaAlmacen || null,
-        fechasAlmacen: updateForm.noHayEnAlmacen ? [] : fechasAlmacen,
+          : updateForm.fechaAlmacen,
+        fechasAlmacen,
         cajaUnica: Boolean(updateForm.cajaUnica),
-        estado: updateForm.noHayEnAlmacen ? "frente-agota" : "frente-cambia",
       };
 
-      const success = await handleUpdateProduct(
+      const estado = classifyProduct(productData);
+
+      const updatedProduct = await handleUpdateProduct(
         editingProduct.producto._id,
-        updateData
+        {
+          ...productData,
+          estado,
+        }
       );
 
-      if (success) {
-        setIsUpdateModalOpen(false);
-        setShowUnclassified(false);
-        setEditingProduct(null);
-        setSelectedProduct(null);
-        setSearchTerm("");
-
-        setTimeout(() => {
-          const productElement = document.querySelector(
-            `[data-product-id="${editingProduct.producto._id}"]`
-          );
-          if (productElement) {
-            productElement.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            });
-          }
-        }, 100);
+      if (updatedProduct) {
+        handleCloseUpdateModal();
+        addToast("Producto actualizado correctamente", "success");
       }
     } catch (error) {
-      addToast(`Error al actualizar: ${error.message}.`, "error");
+      console.error("Error al actualizar producto:", error);
+      addToast(error.message || "Error al actualizar el producto", "error");
     } finally {
       setIsUpdating(false);
     }
@@ -421,6 +402,7 @@ const ProductList = () => {
           isUpdating={isUpdating}
           onClose={handleCloseUpdateModal}
           onSubmit={handleSubmitUpdate}
+          setShowUnclassified={setShowUnclassified}
         />
 
         <ExpiringModal

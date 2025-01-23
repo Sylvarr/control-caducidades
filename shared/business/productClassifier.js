@@ -1,5 +1,6 @@
 import { PRODUCT_STATES } from "../models/Product.js";
 import { validateProductData } from "../validators/productValidators.js";
+import { areDatesEqual, areDateArraysEqual } from "../utils/dateUtils.js";
 
 /**
  * Clasifica un producto basado en sus fechas y estado
@@ -27,17 +28,13 @@ function classifyProduct({
     return PRODUCT_STATES.FRENTE_AGOTA;
   }
 
-  // Convertir fechas a timestamps para comparación
-  const frontDate = new Date(fechaFrente).setHours(0, 0, 0, 0);
-  const storageDate = new Date(fechaAlmacen).setHours(0, 0, 0, 0);
-
   // Si las fechas son diferentes, es "frente-cambia"
-  if (frontDate !== storageDate) {
+  if (!areDatesEqual(fechaFrente, fechaAlmacen)) {
     return PRODUCT_STATES.FRENTE_CAMBIA;
   }
 
   // Si las fechas coinciden
-  if (frontDate === storageDate) {
+  if (areDatesEqual(fechaFrente, fechaAlmacen)) {
     if (cajaUnica) {
       return PRODUCT_STATES.ABIERTO_AGOTA;
     } else if (fechasAlmacen && fechasAlmacen.length > 0) {
@@ -67,9 +64,13 @@ function processProduct(data) {
   // Clasificar producto
   const estado = classifyProduct(data);
 
-  // Retornar objeto completo
+  // Retornar objeto completo con fechas normalizadas
   return {
     ...data,
+    fechaFrente: data.fechaFrente,
+    fechaAlmacen: data.fechaAlmacen,
+    fechasAlmacen: data.fechasAlmacen || [],
+    cajaUnica: Boolean(data.cajaUnica),
     estado,
   };
 }
@@ -83,6 +84,7 @@ function processProduct(data) {
 function compareClassifications(localResult, serverResult) {
   const differences = [];
 
+  // Comparar estados
   if (localResult.estado !== serverResult.estado) {
     differences.push({
       field: "estado",
@@ -93,64 +95,45 @@ function compareClassifications(localResult, serverResult) {
     });
   }
 
-  // Comparar fechas (convertidas a timestamp para evitar problemas de formato)
-  const compareDates = (local, server, fieldName) => {
-    if (!local && !server) return;
-    if (!local || !server) {
-      differences.push({
-        field: fieldName,
-        local: local ? new Date(local).toISOString() : null,
-        server: server ? new Date(server).toISOString() : null,
-        description: `La fecha ${fieldName} no coincide`,
-      });
-      return;
-    }
-    const localDate = new Date(local).setHours(0, 0, 0, 0);
-    const serverDate = new Date(server).setHours(0, 0, 0, 0);
-    if (localDate !== serverDate) {
-      differences.push({
-        field: fieldName,
-        local: new Date(local).toISOString(),
-        server: new Date(server).toISOString(),
-        description: `La fecha ${fieldName} no coincide`,
-      });
-    }
-  };
+  // Comparar fechas individuales
+  if (!areDatesEqual(localResult.fechaFrente, serverResult.fechaFrente)) {
+    differences.push({
+      field: "fechaFrente",
+      local: localResult.fechaFrente,
+      server: serverResult.fechaFrente,
+      description: "La fecha de frente no coincide",
+    });
+  }
 
-  compareDates(
-    localResult.fechaFrente,
-    serverResult.fechaFrente,
-    "fechaFrente"
-  );
-  compareDates(
-    localResult.fechaAlmacen,
-    serverResult.fechaAlmacen,
-    "fechaAlmacen"
-  );
+  if (!areDatesEqual(localResult.fechaAlmacen, serverResult.fechaAlmacen)) {
+    differences.push({
+      field: "fechaAlmacen",
+      local: localResult.fechaAlmacen,
+      server: serverResult.fechaAlmacen,
+      description: "La fecha de almacén no coincide",
+    });
+  }
 
   // Comparar arrays de fechas
   if (
-    Array.isArray(localResult.fechasAlmacen) &&
-    Array.isArray(serverResult.fechasAlmacen)
+    !areDateArraysEqual(localResult.fechasAlmacen, serverResult.fechasAlmacen)
   ) {
-    if (
-      localResult.fechasAlmacen.length !== serverResult.fechasAlmacen.length
-    ) {
-      differences.push({
-        field: "fechasAlmacen",
-        local: localResult.fechasAlmacen,
-        server: serverResult.fechasAlmacen,
-        description: "El número de fechas de almacén no coincide",
-      });
-    } else {
-      localResult.fechasAlmacen.forEach((fecha, index) => {
-        compareDates(
-          fecha,
-          serverResult.fechasAlmacen[index],
-          `fechasAlmacen[${index}]`
-        );
-      });
-    }
+    differences.push({
+      field: "fechasAlmacen",
+      local: localResult.fechasAlmacen,
+      server: serverResult.fechasAlmacen,
+      description: "Las fechas de almacén adicionales no coinciden",
+    });
+  }
+
+  // Comparar caja única
+  if (Boolean(localResult.cajaUnica) !== Boolean(serverResult.cajaUnica)) {
+    differences.push({
+      field: "cajaUnica",
+      local: localResult.cajaUnica,
+      server: serverResult.cajaUnica,
+      description: "El estado de caja única no coincide",
+    });
   }
 
   return {

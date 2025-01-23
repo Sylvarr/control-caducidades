@@ -1,8 +1,11 @@
 import { RefreshCw, Plus, AlertCircle } from "lucide-react";
 import PropTypes from "prop-types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import CustomDateInput from "./CustomDateInput";
 import ModalContainer from "./ModalContainer";
+import { validateProductData } from "@shared/validators/productValidators";
+import { classifyProduct } from "@shared/business/productClassifier";
+import { PRODUCT_STATES } from "@shared/models/Product";
 
 const CustomCheckbox = ({ id, label, checked, disabled, onChange }) => (
   <div className="flex items-center py-2.5 px-3 my-1.5 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors duration-200">
@@ -82,66 +85,88 @@ const UpdateModal = ({
   isUpdating,
   onClose,
   onSubmit,
+  setShowUnclassified,
 }) => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingNoHayEnAlmacen, setPendingNoHayEnAlmacen] = useState(false);
   const [dateErrors, setDateErrors] = useState({
+    fechaFrente: "",
+    fechaAlmacen: "",
     fechaAlmacen2: "",
     fechaAlmacen3: "",
   });
+  const [calculatedState, setCalculatedState] = useState(
+    PRODUCT_STATES.SIN_CLASIFICAR
+  );
   const [showFrontDateDialog, setShowFrontDateDialog] = useState(false);
 
-  // Función para validar que una fecha sea posterior a otra
-  const isDateAfter = (dateToCheck, baseDate) => {
-    if (!dateToCheck || !baseDate) return true;
-    const date1 = new Date(dateToCheck);
-    const date2 = new Date(baseDate);
-    return date1 > date2;
-  };
-
-  // Función para validar fechas adicionales
-  const validateAdditionalDate = (value, dateNumber) => {
-    // Si no hay valor, solo limpiar el error y retornar true
-    if (!value) {
-      setDateErrors((prev) => ({ ...prev, [`fechaAlmacen${dateNumber}`]: "" }));
-      return true;
+  // Validar fechas y calcular estado cuando cambien
+  useEffect(() => {
+    // Solo validar si hay fecha frente
+    if (!updateForm.fechaFrente) {
+      setDateErrors({
+        fechaFrente: "",
+        fechaAlmacen: "",
+        fechaAlmacen2: "",
+        fechaAlmacen3: "",
+      });
+      setCalculatedState(PRODUCT_STATES.SIN_CLASIFICAR);
+      return;
     }
 
-    const baseDate =
-      dateNumber === 2 ? updateForm.fechaAlmacen : updateForm.fechaAlmacen2;
-
-    // Si no hay fecha base, no validar aún
-    if (!baseDate) {
-      return true;
+    const fechasAlmacen = [];
+    if (!updateForm.noHayEnAlmacen) {
+      if (updateForm.fechaAlmacen) {
+        fechasAlmacen.push(updateForm.fechaAlmacen);
+      }
+      if (updateForm.showSecondDate && updateForm.fechaAlmacen2) {
+        fechasAlmacen.push(updateForm.fechaAlmacen2);
+      }
+      if (updateForm.showThirdDate && updateForm.fechaAlmacen3) {
+        fechasAlmacen.push(updateForm.fechaAlmacen3);
+      }
     }
 
-    const isValid = isDateAfter(value, baseDate);
+    const productData = {
+      fechaFrente: updateForm.fechaFrente,
+      fechaAlmacen: updateForm.noHayEnAlmacen ? null : updateForm.fechaAlmacen,
+      fechasAlmacen,
+      cajaUnica: Boolean(updateForm.cajaUnica),
+    };
 
-    if (!isValid) {
-      setDateErrors((prev) => ({
-        ...prev,
-        [`fechaAlmacen${dateNumber}`]: `La fecha debe ser posterior a la ${
-          dateNumber === 2 ? "primera" : "segunda"
-        } fecha`,
-      }));
+    const validationResult = validateProductData(productData);
+    const newErrors = {
+      fechaFrente: "",
+      fechaAlmacen: "",
+      fechaAlmacen2: "",
+      fechaAlmacen3: "",
+    };
 
-      setUpdateForm((prev) => ({
-        ...prev,
-        [`fechaAlmacen${dateNumber}`]: "",
-        ...(dateNumber === 2 && {
-          fechaAlmacen3: "",
-          showThirdDate: false,
-        }),
-      }));
-    } else {
-      setDateErrors((prev) => ({
-        ...prev,
-        [`fechaAlmacen${dateNumber}`]: "",
-      }));
+    validationResult.errors.forEach((error) => {
+      if (error.includes("fecha de frente")) {
+        newErrors.fechaFrente = "Fecha inválida";
+      } else if (error.includes("fecha de almacén #2")) {
+        newErrors.fechaAlmacen2 = "La fecha es anterior a Fecha Almacén";
+      } else if (error.includes("fecha de almacén #3")) {
+        newErrors.fechaAlmacen3 = "La fecha es anterior a Segunda Fecha";
+      } else if (error.includes("fecha de almacén")) {
+        newErrors.fechaAlmacen = "La fecha es anterior a Fecha Frente";
+      }
+    });
+
+    setDateErrors(newErrors);
+
+    // Calcular estado solo si no hay errores
+    if (validationResult.isValid) {
+      try {
+        const estado = classifyProduct(productData);
+        setCalculatedState(estado);
+      } catch (error) {
+        console.error("Error al clasificar producto:", error);
+        setCalculatedState(PRODUCT_STATES.SIN_CLASIFICAR);
+      }
     }
-
-    return isValid;
-  };
+  }, [updateForm]);
 
   // Función para manejar la eliminación de la fecha de frente
   const handleFrontDateRemoval = () => {
@@ -184,7 +209,6 @@ const UpdateModal = ({
       fechaAlmacen: prev.fechaAlmacen2 || "",
       fechaAlmacen2: prev.fechaAlmacen3 || "",
       fechaAlmacen3: "",
-      showThirdDate: false,
       showSecondDate: Boolean(prev.fechaAlmacen3),
     }));
     setShowFrontDateDialog(false);
@@ -286,10 +310,12 @@ const UpdateModal = ({
 
   const canAddMoreDates =
     !updateForm.noHayEnAlmacen &&
-    updateForm.fechaAlmacen && // Solo permitir añadir si hay fecha principal
+    updateForm.fechaAlmacen &&
+    !dateErrors.fechaAlmacen && // Solo permitir añadir si la fecha principal es válida
     (!updateForm.showSecondDate ||
       (updateForm.showSecondDate &&
         updateForm.fechaAlmacen2 &&
+        !dateErrors.fechaAlmacen2 &&
         !updateForm.showThirdDate));
 
   const handleNoHayEnAlmacenChange = (checked) => {
@@ -353,6 +379,11 @@ const UpdateModal = ({
                   }
                   onRemove={handleFrontDateRemoval}
                 />
+                {dateErrors.fechaFrente && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {dateErrors.fechaFrente}
+                  </p>
+                )}
               </div>
 
               <div className="relative">
@@ -386,7 +417,13 @@ const UpdateModal = ({
                           })
                         }
                         onRemove={() => handleStorageDateRemoval(1)}
+                        disabled={!updateForm.fechaFrente}
                       />
+                      {dateErrors.fechaAlmacen && (
+                        <p className="mt-1 text-sm text-red-600">
+                          {dateErrors.fechaAlmacen}
+                        </p>
+                      )}
 
                       {updateForm.showSecondDate && (
                         <div className="relative">
@@ -394,20 +431,22 @@ const UpdateModal = ({
                             label="Segunda Fecha"
                             value={updateForm.fechaAlmacen2}
                             onChange={(value) => {
-                              if (validateAdditionalDate(value, 2)) {
-                                setUpdateForm({
-                                  ...updateForm,
-                                  fechaAlmacen2: value,
-                                  ...(value === "" && {
-                                    fechaAlmacen3: "",
-                                    showThirdDate: false,
-                                  }),
-                                });
-                              }
+                              setUpdateForm({
+                                ...updateForm,
+                                fechaAlmacen2: value,
+                                ...(value === "" && {
+                                  fechaAlmacen3: "",
+                                  showThirdDate: false,
+                                }),
+                              });
                             }}
                             data-date-input="fechaAlmacen2"
                             onRemove={() => handleStorageDateRemoval(2)}
                             showRemoveWhenEmpty
+                            disabled={
+                              !updateForm.fechaAlmacen ||
+                              dateErrors.fechaAlmacen
+                            }
                           />
                           {dateErrors.fechaAlmacen2 && (
                             <p className="mt-1 text-sm text-red-600">
@@ -423,16 +462,18 @@ const UpdateModal = ({
                             label="Tercera Fecha"
                             value={updateForm.fechaAlmacen3}
                             onChange={(value) => {
-                              if (validateAdditionalDate(value, 3)) {
-                                setUpdateForm({
-                                  ...updateForm,
-                                  fechaAlmacen3: value,
-                                });
-                              }
+                              setUpdateForm({
+                                ...updateForm,
+                                fechaAlmacen3: value,
+                              });
                             }}
                             data-date-input="fechaAlmacen3"
                             onRemove={() => handleStorageDateRemoval(3)}
                             showRemoveWhenEmpty
+                            disabled={
+                              !updateForm.fechaAlmacen2 ||
+                              dateErrors.fechaAlmacen2
+                            }
                           />
                           {dateErrors.fechaAlmacen3 && (
                             <p className="mt-1 text-sm text-red-600">
@@ -451,7 +492,9 @@ const UpdateModal = ({
                         text-sm font-medium text-[#1d5030] bg-[#1d5030]/10
                         hover:bg-[#1d5030]/20 rounded-lg transition-colors duration-200
                         disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!updateForm.fechaAlmacen}
+                      disabled={
+                        !updateForm.fechaAlmacen || dateErrors.fechaAlmacen
+                      }
                     >
                       <Plus className="w-4 h-4" />
                       Añadir fecha adicional
@@ -477,36 +520,54 @@ const UpdateModal = ({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 p-5 pt-3 border-t border-gray-200">
-            <button
-              onClick={onClose}
-              className="min-h-[42px] px-5 text-sm font-medium text-[#2d3748]
-                bg-gray-50 hover:bg-gray-100
-                rounded-lg transition-colors duration-200"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onSubmit}
-              disabled={
-                isUpdating ||
-                Object.values(dateErrors).some((error) => error !== "")
-              }
-              className="min-h-[42px] px-5 text-sm font-medium text-white
-                bg-[#1d5030] hover:bg-[#1d5030]/90
-                rounded-lg transition-colors duration-200
-                disabled:opacity-50 disabled:cursor-not-allowed
-                flex items-center gap-2"
-            >
-              {isUpdating ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  Actualizando...
-                </>
-              ) : (
-                "Guardar"
-              )}
-            </button>
+          <div className="flex justify-between items-center w-full p-5 pt-3 border-t border-gray-200">
+            <div className="text-sm text-gray-600">
+              Estado calculado:{" "}
+              <span className="font-medium">
+                {calculatedState.replace(/-/g, " ").toUpperCase()}
+              </span>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={onClose}
+                className="min-h-[42px] px-5 text-sm font-medium text-[#2d3748]
+                  bg-gray-50 hover:bg-gray-100
+                  rounded-lg transition-colors duration-200"
+                disabled={isUpdating}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  await onSubmit(e);
+                  if (!isUpdating) {
+                    onClose();
+                    // Cerrar también la lista de sin clasificar
+                    setShowUnclassified(false);
+                  }
+                }}
+                disabled={
+                  isUpdating ||
+                  !updateForm.fechaFrente ||
+                  Object.values(dateErrors).some((error) => error !== "")
+                }
+                className="min-h-[42px] px-5 text-sm font-medium text-white
+                  bg-[#1d5030] hover:bg-[#1d5030]/90
+                  rounded-lg transition-colors duration-200
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  flex items-center gap-2"
+              >
+                {isUpdating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Actualizando...
+                  </>
+                ) : (
+                  "Guardar"
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </ModalContainer>
@@ -591,5 +652,6 @@ UpdateModal.propTypes = {
   isUpdating: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
+  setShowUnclassified: PropTypes.func.isRequired,
 };
 export default UpdateModal;
