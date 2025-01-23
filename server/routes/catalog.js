@@ -1,7 +1,13 @@
-const express = require("express");
+import express from "express";
+import { verifyToken, isSupervisor } from "../middleware/auth.js";
+import {
+  getAllProducts,
+  addProduct,
+  deleteProduct,
+  toggleProductStatus,
+} from "../controllers/catalogController.js";
+
 const router = express.Router();
-const catalogController = require("../controllers/catalogController");
-const { verifyToken, isSupervisor } = require("../middleware/auth");
 
 // Middleware de logging para depuración
 router.use((req, res, next) => {
@@ -15,19 +21,11 @@ router.use((req, res, next) => {
 });
 
 // Rutas públicas (requieren autenticación)
-router.get("/", verifyToken, catalogController.getAllProducts);
+router.get("/", verifyToken, getAllProducts);
 
 // Rutas protegidas (solo supervisores)
-router.post("/", [verifyToken, isSupervisor], catalogController.addProduct);
-router.delete(
-  "/:id",
-  [verifyToken, isSupervisor],
-  catalogController.deleteProduct
-);
-router.patch(
-  "/:id/toggle",
-  [verifyToken, isSupervisor],
-  catalogController.toggleProductStatus
-);
+router.post("/", [verifyToken, isSupervisor], addProduct);
+router.delete("/:id", [verifyToken, isSupervisor], deleteProduct);
+router.patch("/:id/toggle", [verifyToken, isSupervisor], toggleProductStatus);
 
-module.exports = router;
+export default router;

@@ -1,4 +1,6 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+import { PRODUCT_STATES } from "../../shared/models/Product.js";
+import { processProduct } from "../../shared/business/productClassifier.js";
 
 const productStatusSchema = new mongoose.Schema(
   {
@@ -25,15 +27,9 @@ const productStatusSchema = new mongoose.Schema(
     },
     estado: {
       type: String,
-      enum: [
-        "sin-clasificar",
-        "frente-agota",
-        "frente-cambia",
-        "abierto-cambia",
-        "abierto-agota",
-      ],
+      enum: Object.values(PRODUCT_STATES),
       required: true,
-      default: "sin-clasificar",
+      default: PRODUCT_STATES.SIN_CLASIFICAR,
     },
   },
   {
@@ -42,48 +38,17 @@ const productStatusSchema = new mongoose.Schema(
 );
 
 productStatusSchema.pre("save", function (next) {
-  console.log("Pre-save middleware ejecutándose con datos:", {
-    fechaFrente: this.fechaFrente,
-    fechaAlmacen: this.fechaAlmacen,
-    fechasAlmacen: this.fechasAlmacen,
-    cajaUnica: this.cajaUnica,
-    estado: this.estado,
-  });
-
   try {
-    // Si no hay fecha de almacén, es "frente-agota"
-    if (!this.fechaAlmacen) {
-      console.log("Estableciendo estado: frente-agota (sin fecha almacén)");
-      this.estado = "frente-agota";
-      return next();
-    }
+    // Usar la lógica compartida para procesar y clasificar el producto
+    const processed = processProduct({
+      fechaFrente: this.fechaFrente,
+      fechaAlmacen: this.fechaAlmacen,
+      fechasAlmacen: this.fechasAlmacen,
+      cajaUnica: this.cajaUnica,
+    });
 
-    // Convertir fechas a timestamps para comparación
-    const frontDate = new Date(this.fechaFrente).setHours(0, 0, 0, 0);
-    const storageDate = new Date(this.fechaAlmacen).setHours(0, 0, 0, 0);
-
-    // Si las fechas son diferentes, es "frente-cambia"
-    if (frontDate !== storageDate) {
-      console.log("Estableciendo estado: frente-cambia (fechas diferentes)");
-      this.estado = "frente-cambia";
-      return next();
-    }
-
-    // Si las fechas coinciden
-    if (frontDate === storageDate) {
-      if (this.cajaUnica) {
-        console.log("Estableciendo estado: abierto-agota (última caja)");
-        this.estado = "abierto-agota";
-      } else if (this.fechasAlmacen && this.fechasAlmacen.length > 0) {
-        console.log("Estableciendo estado: abierto-cambia (hay otras fechas)");
-        this.estado = "abierto-cambia";
-      } else {
-        console.log(
-          "Estableciendo estado: sin-clasificar (fechas iguales, sin condiciones especiales)"
-        );
-        this.estado = "sin-clasificar";
-      }
-    }
+    // Actualizar el estado
+    this.estado = processed.estado;
 
     next();
   } catch (error) {
@@ -92,4 +57,4 @@ productStatusSchema.pre("save", function (next) {
   }
 });
 
-module.exports = mongoose.model("ProductStatus", productStatusSchema);
+export default mongoose.model("ProductStatus", productStatusSchema);

@@ -1,7 +1,7 @@
-const ProductStatus = require("../models/Product");
+import ProductStatus from "../models/Product.js";
 
 // Es importante que TODAS las funciones estén definidas
-exports.getAllStatus = async (req, res) => {
+export const getAllStatus = async (req, res) => {
   try {
     const statuses = await ProductStatus.find().populate("producto", "nombre");
     res.json(statuses);
@@ -12,7 +12,7 @@ exports.getAllStatus = async (req, res) => {
   }
 };
 
-exports.getByStatus = async (req, res) => {
+export const getByStatus = async (req, res) => {
   try {
     const { estado } = req.params;
     const statuses = await ProductStatus.find({ estado }).populate(
@@ -27,7 +27,7 @@ exports.getByStatus = async (req, res) => {
   }
 };
 
-exports.updateStatus = async (req, res) => {
+export const updateStatus = async (req, res) => {
   try {
     console.log("Recibiendo actualización:", {
       productoId: req.params.productoId,
@@ -113,7 +113,7 @@ exports.updateStatus = async (req, res) => {
   }
 };
 
-exports.deleteStatus = async (req, res) => {
+export const deleteStatus = async (req, res) => {
   try {
     const { productoId } = req.params;
     const deletedStatus = await ProductStatus.findOneAndDelete({

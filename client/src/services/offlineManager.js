@@ -1,8 +1,12 @@
 import FeatureManager from "../config/features";
 import OfflineDebugger from "../utils/debugger";
 import IndexedDB from "./indexedDB";
-import { processProduct, compareClassifications } from "./productClassifier";
+import {
+  processProduct,
+  compareClassifications,
+} from "@shared/business/productClassifier";
 import * as api from "./api";
+import IdGenerator from "./idGenerator";
 
 class OfflineManager {
   static instance = null;
@@ -59,7 +63,7 @@ class OfflineManager {
 
   async updateProductStatus(productId, data) {
     try {
-      // Procesar y validar datos localmente
+      // Procesar y validar datos localmente usando la lógica compartida
       const processedData = processProduct(data);
 
       if (this.isOnline && !this.isOfflineMode) {
@@ -68,7 +72,7 @@ class OfflineManager {
           processedData
         );
 
-        // Comparar clasificación local con servidor
+        // Comparar clasificación local con servidor usando la lógica compartida
         const comparison = compareClassifications(processedData, serverResult);
         if (!comparison.match) {
           OfflineDebugger.log("CLASSIFICATION_MISMATCH", comparison);
@@ -229,19 +233,17 @@ class OfflineManager {
         (change) => change.type === "CREATE_CATALOG"
       );
 
-      // Mapa para guardar la relación entre IDs temporales y permanentes
-      const idMapping = new Map();
-
       // Procesar creaciones de productos primero
       for (const change of catalogChanges) {
         try {
           const response = await this.processChange(change);
           if (response && response._id && change.tempId) {
-            idMapping.set(change.tempId, response._id);
+            // Usar el nuevo servicio para registrar el mapeo
+            await IdGenerator.registerPermanentId(change.tempId, response._id);
             await IndexedDB.removePendingChange(change.id);
 
             // Actualizar el producto en IndexedDB con su nuevo ID
-            await IndexedDB.updateCatalogProduct(change.tempId, {
+            await IndexedDB.saveCatalogProduct({
               ...response,
               _id: response._id,
             });
@@ -255,9 +257,12 @@ class OfflineManager {
       const remainingChanges = changes.filter(
         (change) => !catalogChanges.includes(change)
       );
+
       for (const change of remainingChanges) {
-        if (change.productId && change.productId.startsWith("temp_")) {
-          const permanentId = idMapping.get(change.productId);
+        if (change.productId && IdGenerator.isTempId(change.productId)) {
+          const permanentId = await IdGenerator.getPermanentId(
+            change.productId
+          );
           if (permanentId) {
             // Actualizar tanto el productId como la referencia en los datos
             change.productId = permanentId;
@@ -373,8 +378,13 @@ class OfflineManager {
         return result;
       }
 
-      // Generar un ID temporal para modo offline
-      const tempId = `temp_${Date.now()}`;
+      // Generar un ID temporal usando el nuevo servicio
+      OfflineDebugger.log("GENERATING_TEMP_ID");
+      const tempId = IdGenerator.generateTempId(
+        IdGenerator.entityTypes.CATALOG_PRODUCT
+      );
+      OfflineDebugger.log("TEMP_ID_GENERATED", { tempId });
+
       const productToSave = {
         _id: tempId,
         ...productData,
@@ -382,13 +392,20 @@ class OfflineManager {
         updatedAt: new Date().toISOString(),
       };
 
+      OfflineDebugger.log("SAVING_PRODUCT_TO_INDEXEDDB", {
+        product: productToSave,
+      });
       await IndexedDB.saveCatalogProduct(productToSave);
+      OfflineDebugger.log("PRODUCT_SAVED_TO_INDEXEDDB", { tempId });
+
+      OfflineDebugger.log("CREATING_PENDING_CHANGE", { tempId });
       await IndexedDB.addPendingChange({
         type: "CREATE_CATALOG",
         tempId: tempId,
         data: productData,
         timestamp: new Date().toISOString(),
       });
+      OfflineDebugger.log("PENDING_CHANGE_CREATED", { tempId });
 
       return productToSave;
     } catch (error) {

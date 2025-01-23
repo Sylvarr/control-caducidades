@@ -1,9 +1,9 @@
-const User = require("../models/User");
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
+import User from "../models/User.js";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
 // Login
-exports.login = async (req, res) => {
+export const login = async (req, res) => {
   try {
     console.log("Inicio de solicitud de login");
     const { username, password } = req.body;
@@ -95,7 +95,7 @@ exports.login = async (req, res) => {
 };
 
 // Obtener usuario actual
-exports.getCurrentUser = async (req, res) => {
+export const getCurrentUser = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     res.json(user);
@@ -108,7 +108,7 @@ exports.getCurrentUser = async (req, res) => {
 };
 
 // Cambiar contraseña
-exports.changePassword = async (req, res) => {
+export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -151,7 +151,7 @@ exports.changePassword = async (req, res) => {
 };
 
 // Obtener todos los usuarios (solo supervisor)
-exports.getAllUsers = async (req, res) => {
+export const getAllUsers = async (req, res) => {
   try {
     const users = await User.find().select("-password");
     res.json(users);
@@ -164,7 +164,7 @@ exports.getAllUsers = async (req, res) => {
 };
 
 // Crear usuario (solo supervisor)
-exports.createUser = async (req, res) => {
+export const createUser = async (req, res) => {
   try {
     const { username, password, role, restaurante } = req.body;
     console.log("Datos recibidos:", { username, role, restaurante });
@@ -249,10 +249,10 @@ exports.createUser = async (req, res) => {
 };
 
 // Actualizar usuario (solo supervisor)
-exports.updateUser = async (req, res) => {
+export const updateUser = async (req, res) => {
   try {
-    const { username, role } = req.body;
-    const userId = req.params.id;
+    const { id } = req.params;
+    const { username, role, restaurante } = req.body;
 
     // Validar entrada
     if (!username || !role) {
@@ -262,16 +262,18 @@ exports.updateUser = async (req, res) => {
     }
 
     // Verificar si el usuario existe
-    const user = await User.findById(userId);
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({
         error: "Usuario no encontrado",
       });
     }
 
-    // Actualizar usuario
+    // Actualizar campos
     user.username = username;
     user.role = role;
+    user.restaurante = restaurante;
+
     await user.save();
 
     // Emitir evento de socket para la actualización
@@ -282,6 +284,7 @@ exports.updateUser = async (req, res) => {
           id: user._id,
           username: user.username,
           role: user.role,
+          restaurante: user.restaurante,
         },
       });
     }
@@ -292,6 +295,7 @@ exports.updateUser = async (req, res) => {
         id: user._id,
         username: user.username,
         role: user.role,
+        restaurante: user.restaurante,
       },
     });
   } catch (error) {
@@ -303,35 +307,31 @@ exports.updateUser = async (req, res) => {
 };
 
 // Eliminar usuario (solo supervisor)
-exports.deleteUser = async (req, res) => {
+export const deleteUser = async (req, res) => {
   try {
-    const userId = req.params.id;
+    const { id } = req.params;
 
-    // Verificar si el usuario existe
-    const user = await User.findById(userId);
+    // No permitir eliminar al usuario admin
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({
         error: "Usuario no encontrado",
       });
     }
 
-    // No permitir eliminar al último supervisor
-    if (user.role === "supervisor") {
-      const supervisorCount = await User.countDocuments({ role: "supervisor" });
-      if (supervisorCount <= 1) {
-        return res.status(400).json({
-          error: "No se puede eliminar al último supervisor",
-        });
-      }
+    if (user.username === "admin") {
+      return res.status(403).json({
+        error: "No se puede eliminar al usuario admin",
+      });
     }
 
-    await user.deleteOne();
+    await User.findByIdAndDelete(id);
 
     // Emitir evento de socket para la actualización
     if (global.io) {
       global.io.emit("userUpdate", {
         type: "delete",
-        userId: userId,
+        userId: id,
       });
     }
 

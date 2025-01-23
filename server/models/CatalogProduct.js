@@ -1,4 +1,5 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
+import { PRODUCT_TYPES } from "../../shared/models/Product.js";
 
 const catalogProductSchema = new mongoose.Schema(
   {
@@ -13,8 +14,8 @@ const catalogProductSchema = new mongoose.Schema(
     },
     tipo: {
       type: String,
-      enum: ["permanente", "promocional"],
-      default: "permanente",
+      enum: Object.values(PRODUCT_TYPES),
+      default: PRODUCT_TYPES.PERMANENTE,
     },
   },
   {
@@ -22,4 +23,4 @@ const catalogProductSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("CatalogProduct", catalogProductSchema);
+export default mongoose.model("CatalogProduct", catalogProductSchema);

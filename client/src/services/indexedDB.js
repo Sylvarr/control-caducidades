@@ -1,12 +1,15 @@
 import OfflineDebugger from "../utils/debugger";
 
 const DB_NAME = "control-caducidades";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 const STORES = {
   PRODUCTS: "products",
   PENDING_CHANGES: "pendingChanges",
   CATALOG: "catalog",
+  LOCKS: "locks",
+  RECOVERY_POINTS: "recoveryPoints",
+  ID_MAPPING: "idMapping",
 };
 
 class IndexedDBService {
@@ -42,6 +45,7 @@ class IndexedDBService {
           });
           productStore.createIndex("estado", "estado");
           productStore.createIndex("updatedAt", "updatedAt");
+          productStore.createIndex("syncStatus", "syncStatus");
         }
 
         // Store para cambios pendientes de sincronización
@@ -53,6 +57,8 @@ class IndexedDBService {
           pendingStore.createIndex("timestamp", "timestamp");
           pendingStore.createIndex("type", "type");
           pendingStore.createIndex("productId", "productId");
+          pendingStore.createIndex("status", "status");
+          pendingStore.createIndex("recoveryPointId", "recoveryPointId");
         }
 
         // Store para el catálogo de productos
@@ -63,6 +69,36 @@ class IndexedDBService {
           catalogStore.createIndex("nombre", "nombre");
           catalogStore.createIndex("tipo", "tipo");
           catalogStore.createIndex("updatedAt", "updatedAt");
+          catalogStore.createIndex("syncStatus", "syncStatus");
+        }
+
+        // Store para locks
+        if (!db.objectStoreNames.contains(STORES.LOCKS)) {
+          const lockStore = db.createObjectStore(STORES.LOCKS, {
+            keyPath: "productId",
+          });
+          lockStore.createIndex("timestamp", "timestamp");
+          lockStore.createIndex("tabId", "tabId");
+        }
+
+        // Store para puntos de recuperación
+        if (!db.objectStoreNames.contains(STORES.RECOVERY_POINTS)) {
+          const recoveryStore = db.createObjectStore(STORES.RECOVERY_POINTS, {
+            keyPath: ["productId", "timestamp"],
+          });
+          recoveryStore.createIndex("productId", "productId");
+          recoveryStore.createIndex("timestamp", "timestamp");
+        }
+
+        // Nueva store para mapeo de IDs temporales a permanentes
+        if (!db.objectStoreNames.contains(STORES.ID_MAPPING)) {
+          const idMappingStore = db.createObjectStore(STORES.ID_MAPPING, {
+            keyPath: "tempId",
+          });
+          idMappingStore.createIndex("permanentId", "permanentId");
+          idMappingStore.createIndex("entityType", "entityType");
+          idMappingStore.createIndex("createdAt", "createdAt");
+          idMappingStore.createIndex("syncedAt", "syncedAt");
         }
       };
     });
@@ -249,6 +285,61 @@ class IndexedDBService {
         OfflineDebugger.error("CLEAR_PRODUCT_STATUS_ERROR", request.error);
         reject(request.error);
       };
+    });
+  }
+
+  // Nuevos métodos para el mapeo de IDs
+  async saveIdMapping(mapping) {
+    const store = await this.getStore(STORES.ID_MAPPING, "readwrite");
+    return new Promise((resolve, reject) => {
+      const request = store.put({
+        ...mapping,
+        createdAt: mapping.createdAt || new Date().toISOString(),
+      });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getIdMapping(tempId) {
+    const store = await this.getStore(STORES.ID_MAPPING);
+    return new Promise((resolve, reject) => {
+      const request = store.get(tempId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async updateIdMapping(tempId, permanentId) {
+    const store = await this.getStore(STORES.ID_MAPPING, "readwrite");
+    return new Promise((resolve, reject) => {
+      const request = store.get(tempId);
+      request.onsuccess = () => {
+        const mapping = request.result;
+        if (mapping) {
+          mapping.permanentId = permanentId;
+          mapping.syncedAt = new Date().toISOString();
+          store.put(mapping).onsuccess = () => resolve(mapping);
+        } else {
+          reject(new Error(`No mapping found for tempId: ${tempId}`));
+        }
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getAllPendingMappings() {
+    const store = await this.getStore(STORES.ID_MAPPING);
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => {
+        // Filtrar solo los mappings que no tienen permanentId
+        const pendingMappings = request.result.filter(
+          (mapping) => !mapping.permanentId
+        );
+        resolve(pendingMappings);
+      };
+      request.onerror = () => reject(request.error);
     });
   }
 }

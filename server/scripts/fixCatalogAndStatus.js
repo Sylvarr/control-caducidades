@@ -1,10 +1,16 @@
-const mongoose = require("mongoose");
-const path = require("path");
-const CatalogProduct = require("../models/CatalogProduct");
-const ProductStatus = require("../models/Product");
+import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import CatalogProduct from "../models/CatalogProduct.js";
+import ProductStatus from "../models/Product.js";
+
+// Configurar __dirname para ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const envPath = path.resolve(__dirname, "../.env");
-require("dotenv").config({ path: envPath });
+dotenv.config({ path: envPath });
 
 async function fixCatalogAndStatus() {
   try {

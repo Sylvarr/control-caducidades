@@ -1,17 +1,23 @@
-const express = require("express");
+import express from "express";
+import { verifyToken, isSupervisor } from "../middleware/auth.js";
+import {
+  getAllProducts,
+  addProduct,
+  deleteProduct,
+  toggleProductStatus,
+} from "../controllers/catalogController.js";
+
 const router = express.Router();
-const catalogController = require("../controllers/catalogController");
-const { verifyToken, isSupervisor } = require("../middleware/auth");
 
 // Rutas protegidas con autenticación
 router.use(verifyToken);
 
 // Rutas para todos los usuarios autenticados
-router.get("/", catalogController.getAllProducts);
+router.get("/", getAllProducts);
 
 // Rutas solo para supervisores
-router.post("/", isSupervisor, catalogController.addProduct);
-router.delete("/:id", isSupervisor, catalogController.deleteProduct);
-router.put("/:id/toggle", isSupervisor, catalogController.toggleProductStatus);
+router.post("/", isSupervisor, addProduct);
+router.delete("/:id", isSupervisor, deleteProduct);
+router.put("/:id/toggle", isSupervisor, toggleProductStatus);
 
-module.exports = router;
+export default router;

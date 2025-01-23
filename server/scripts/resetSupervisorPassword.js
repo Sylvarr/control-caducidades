@@ -1,6 +1,15 @@
-const mongoose = require("mongoose");
-const User = require("../models/User");
-require("dotenv").config({ path: "../.env" });
+import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+import User from "../models/User.js";
+
+// Configurar __dirname para ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const envPath = path.resolve(__dirname, "../.env");
+dotenv.config({ path: envPath });
 
 async function resetSupervisorPassword() {
   try {

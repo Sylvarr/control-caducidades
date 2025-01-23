@@ -7,6 +7,7 @@ import {
 import PropTypes from "prop-types";
 import ProductList from "./components/ProductList";
 import Login from "./components/Login";
+import ConnectionStatus from "./components/ConnectionStatus";
 import AuthProvider from "./contexts/providers/AuthProvider";
 import { SocketProvider } from "./contexts/providers/SocketProvider";
 import { SyncProvider } from "./contexts/providers/SyncProvider";
@@ -43,6 +44,7 @@ const App = () => {
                 }
               />
             </Routes>
+            <ConnectionStatus />
           </Router>
         </SyncProvider>
       </SocketProvider>

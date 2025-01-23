@@ -1,8 +1,8 @@
-const { Server } = require("socket.io");
+import { Server } from "socket.io";
 
 let io = null;
 
-function setupSocket(server, allowedOrigins) {
+export function setupSocket(server, allowedOrigins) {
   io = new Server(server, {
     cors: {
       origin: allowedOrigins,
@@ -37,5 +37,3 @@ function setupSocket(server, allowedOrigins) {
 
   return io;
 }
-
-module.exports = { setupSocket };

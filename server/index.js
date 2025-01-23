@@ -1,10 +1,21 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const path = require("path");
-const http = require("http");
-const { setupSocket } = require("./socket");
-const rateLimit = require("express-rate-limit");
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
+import http from "http";
+import { setupSocket } from "./socket.js";
+import rateLimit from "express-rate-limit";
+import dotenv from "dotenv";
+import User from "./models/User.js";
+import catalogRoutes from "./routes/catalogRoutes.js";
+import statusRoutes from "./routes/statusRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import healthRoutes from "./routes/healthRoutes.js";
+
+// Configurar __dirname para ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Cargar variables de entorno según el entorno
 console.log("Directorio actual:", __dirname);
@@ -15,7 +26,7 @@ const envPath = path.join(
 console.log("Intentando cargar archivo de variables de entorno:", envPath);
 
 try {
-  require("dotenv").config({ path: envPath });
+  dotenv.config({ path: envPath });
   console.log("Variables de entorno cargadas desde:", envPath);
 } catch (error) {
   console.error("Error al cargar variables de entorno:", error);
@@ -45,10 +56,6 @@ console.log("Variables de entorno cargadas correctamente");
 console.log("NODE_ENV:", process.env.NODE_ENV);
 console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
 console.log("MONGODB_URI disponible:", !!process.env.MONGODB_URI);
-
-const catalogRoutes = require("./routes/catalogRoutes");
-const statusRoutes = require("./routes/statusRoutes");
-const authRoutes = require("./routes/authRoutes");
 
 const app = express();
 const server = http.createServer(app);
@@ -170,6 +177,7 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/catalog", catalogRoutes);
 app.use("/api/status", statusRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/health", healthRoutes);
 
 // En producción, todas las rutas no-API sirven el index.html
 if (process.env.NODE_ENV === "production") {
@@ -228,7 +236,6 @@ const connectWithRetry = async () => {
       console.log("Host:", mongoose.connection.host);
 
       // Crear usuario admin si no existe
-      const User = require("./models/User");
       const adminExists = await User.findOne({ username: "admin" });
 
       if (!adminExists) {
@@ -246,42 +253,32 @@ const connectWithRetry = async () => {
         } catch (error) {
           console.error("Error al crear usuario admin:", error);
         }
-      } else {
-        console.log("Usuario admin ya existe");
       }
 
       break;
-    } catch (err) {
+    } catch (error) {
+      console.error("Error al conectar a MongoDB:", error);
       retries++;
-      console.error(
-        `Error conectando a MongoDB (intento ${retries}/${maxRetries}):`,
-        err.message
-      );
-      console.error("Stack trace:", err.stack);
-
       if (retries === maxRetries) {
         console.error(
-          "No se pudo conectar a MongoDB después de múltiples intentos"
+          "No se pudo conectar a MongoDB después de",
+          maxRetries,
+          "intentos"
         );
         process.exit(1);
       }
-      // Esperar 5 segundos antes de reintentar
+      console.log("Reintentando en 5 segundos...");
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 };
 
-connectWithRetry();
-
+// Iniciar servidor
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-  console.log("Variables de entorno cargadas:", {
-    NODE_ENV: process.env.NODE_ENV,
-    JWT_SECRET: process.env.JWT_SECRET ? "Configurado" : "No configurado",
-    MONGODB_URI: process.env.MONGODB_URI ? "Configurado" : "No configurado",
-    CORS_ORIGIN: process.env.CORS_ORIGIN,
+connectWithRetry().then(() => {
+  server.listen(PORT, () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
   });
 });
 

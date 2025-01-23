@@ -1,8 +1,8 @@
-const CatalogProduct = require("../models/CatalogProduct");
-const ProductStatus = require("../models/Product");
+import CatalogProduct from "../models/CatalogProduct.js";
+import ProductStatus from "../models/Product.js";
 
 // Obtener todos los productos del catálogo
-exports.getAllProducts = async (req, res) => {
+export const getAllProducts = async (req, res) => {
   try {
     console.log("\n--- Inicio de obtención de productos ---");
     const products = await CatalogProduct.find().sort({ nombre: 1 });
@@ -20,7 +20,7 @@ exports.getAllProducts = async (req, res) => {
 };
 
 // Añadir nuevo producto al catálogo
-exports.addProduct = async (req, res) => {
+export const addProduct = async (req, res) => {
   try {
     const newProduct = new CatalogProduct(req.body);
     const savedProduct = await newProduct.save();
@@ -42,7 +42,7 @@ exports.addProduct = async (req, res) => {
 };
 
 // Eliminar un producto
-exports.deleteProduct = async (req, res) => {
+export const deleteProduct = async (req, res) => {
   try {
     const { id } = req.params;
     const deletedProduct = await CatalogProduct.findByIdAndDelete(id);
@@ -71,7 +71,7 @@ exports.deleteProduct = async (req, res) => {
 };
 
 // Desactivar/activar un producto
-exports.toggleProductStatus = async (req, res) => {
+export const toggleProductStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const product = await CatalogProduct.findById(id);

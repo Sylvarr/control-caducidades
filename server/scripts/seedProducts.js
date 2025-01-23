@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const CatalogProduct = require("../models/CatalogProduct");
+import mongoose from "mongoose";
+import CatalogProduct from "../models/CatalogProduct.js";
 
 const initialProducts = [
   { nombre: "Ketchup", tipo: "permanente" },

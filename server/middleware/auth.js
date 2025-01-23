@@ -1,9 +1,9 @@
-const jwt = require("jsonwebtoken");
-const rateLimit = require("express-rate-limit");
-const { promisify } = require("util");
+import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
+import { promisify } from "util";
 
 // Rate limiter para intentos de login
-exports.loginLimiter = rateLimit({
+export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 5, // 5 intentos
   message: {
@@ -13,7 +13,7 @@ exports.loginLimiter = rateLimit({
 });
 
 // Verificar token JWT
-exports.verifyToken = async (req, res, next) => {
+export const verifyToken = async (req, res, next) => {
   try {
     console.log("\n=== Verificando Token ===");
     // Obtener el token del header
@@ -59,7 +59,7 @@ exports.verifyToken = async (req, res, next) => {
 };
 
 // Middleware para verificar rol de supervisor
-exports.isSupervisor = (req, res, next) => {
+export const isSupervisor = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
       error: "No autorizado",
@@ -76,7 +76,7 @@ exports.isSupervisor = (req, res, next) => {
 };
 
 // Middleware de manejo de errores
-exports.errorHandler = (err, req, res, _next) => {
+export const errorHandler = (err, req, res, _next) => {
   console.error(err.stack);
 
   if (err.name === "ValidationError") {
