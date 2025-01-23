@@ -1,4 +1,6 @@
 import ProductStatus from "../models/Product.js";
+import { processProduct } from "../../shared/business/productClassifier.js";
+import CatalogProduct from "../models/CatalogProduct.js";
 
 // Es importante que TODAS las funciones estén definidas
 export const getAllStatus = async (req, res) => {
@@ -9,6 +11,25 @@ export const getAllStatus = async (req, res) => {
     res
       .status(500)
       .json({ message: "Error al obtener estados", error: error.message });
+  }
+};
+
+export const getStatus = async (req, res) => {
+  try {
+    const { productoId } = req.params;
+    const status = await ProductStatus.findOne({
+      producto: productoId,
+    }).populate("producto", "nombre tipo activo");
+
+    if (!status) {
+      return res.status(404).json({ message: "Estado no encontrado" });
+    }
+
+    res.json(status);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error al obtener estado", error: error.message });
   }
 };
 
@@ -35,6 +56,15 @@ export const updateStatus = async (req, res) => {
     });
 
     const { productoId } = req.params;
+
+    // Verificar que el producto existe en el catálogo
+    const catalogProduct = await CatalogProduct.findById(productoId);
+    if (!catalogProduct) {
+      return res
+        .status(404)
+        .json({ message: "Producto no encontrado en el catálogo" });
+    }
+
     const {
       fechaFrente,
       fechaAlmacen,
@@ -42,17 +72,15 @@ export const updateStatus = async (req, res) => {
       cajaUnica,
     } = req.body;
 
-    console.log("Fecha Frente recibida:", fechaFrente);
-
-    // Preparar los datos de actualización
-    const updateData = {
+    // Procesar y validar datos usando la lógica compartida
+    const processedData = processProduct({
       fechaFrente,
       fechaAlmacen,
       fechasAlmacen,
       cajaUnica: Boolean(cajaUnica),
-    };
+    });
 
-    console.log("Datos de actualización preparados:", updateData);
+    console.log("Datos procesados:", processedData);
 
     // Buscar si ya existe un estado para este producto
     let productStatus = await ProductStatus.findOne({ producto: productoId });
@@ -60,13 +88,13 @@ export const updateStatus = async (req, res) => {
     if (productStatus) {
       console.log("Estado actual encontrado:", productStatus);
       // Actualizar estado existente
-      Object.assign(productStatus, updateData);
+      Object.assign(productStatus, processedData);
     } else {
       // Crear nuevo estado
-      console.log("Creando nuevo estado con:", updateData);
+      console.log("Creando nuevo estado con:", processedData);
       productStatus = new ProductStatus({
         producto: productoId,
-        ...updateData,
+        ...processedData,
       });
     }
 

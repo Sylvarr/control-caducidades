@@ -3,6 +3,8 @@ import PropTypes from "prop-types";
 import ModalContainer from "./ModalContainer";
 
 const formatDate = (dateString) => {
+  if (!dateString) return "Sin fecha";
+
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "Fecha inválida";
@@ -158,7 +160,7 @@ ExpiringModal.propTypes = {
             nombre: PropTypes.string.isRequired,
           }).isRequired,
           daysUntilExpiry: PropTypes.number.isRequired,
-          fechaFrente: PropTypes.string.isRequired,
+          fechaFrente: PropTypes.string,
         })
       ).isRequired,
     })

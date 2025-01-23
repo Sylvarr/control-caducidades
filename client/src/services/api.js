@@ -71,6 +71,18 @@ const httpOperations = {
     return await response.json();
   },
 
+  getProductStatus: async (productId) => {
+    const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
+      headers: getHeaders(),
+    });
+
+    if (!response.ok) {
+      await handleApiError(response);
+    }
+
+    return await response.json();
+  },
+
   updateProductStatus: async (productId, data) => {
     const response = await fetch(`${API_BASE_URL}/status/${productId}`, {
       method: "PUT",

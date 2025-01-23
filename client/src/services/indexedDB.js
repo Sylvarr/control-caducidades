@@ -1,7 +1,7 @@
 import OfflineDebugger from "../utils/debugger";
 
 const DB_NAME = "control-caducidades";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const STORES = {
   PRODUCTS: "products",
@@ -37,6 +37,7 @@ class IndexedDBService {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+        const oldVersion = event.oldVersion;
 
         // Store para productos y sus estados
         if (!db.objectStoreNames.contains(STORES.PRODUCTS)) {
@@ -46,6 +47,25 @@ class IndexedDBService {
           productStore.createIndex("estado", "estado");
           productStore.createIndex("updatedAt", "updatedAt");
           productStore.createIndex("syncStatus", "syncStatus");
+          productStore.createIndex("version", "version");
+        } else if (oldVersion < 4) {
+          const transaction = event.target.transaction;
+          const store = transaction.objectStore(STORES.PRODUCTS);
+
+          if (!store.indexNames.contains("version")) {
+            store.createIndex("version", "version");
+            store.openCursor().onsuccess = (e) => {
+              const cursor = e.target.result;
+              if (cursor) {
+                const product = cursor.value;
+                if (!product.version) {
+                  product.version = 1;
+                  cursor.update(product);
+                }
+                cursor.continue();
+              }
+            };
+          }
         }
 
         // Store para cambios pendientes de sincronización
@@ -135,6 +155,21 @@ class IndexedDBService {
     const store = await this.getStore(STORES.PRODUCTS, "readwrite");
     product.updatedAt = new Date().toISOString();
 
+    // Inicializar o incrementar versión
+    if (!product.version) {
+      product.version = 1;
+    } else if (product._isLocalUpdate) {
+      // Solo incrementar versión si es una actualización local
+      product.version++;
+      delete product._isLocalUpdate;
+    }
+
+    OfflineDebugger.log("SAVE_PRODUCT_STATUS", {
+      productId: product.producto._id,
+      version: product.version,
+      isLocalUpdate: product._isLocalUpdate,
+    });
+
     return new Promise((resolve, reject) => {
       const request = store.put(product);
       request.onsuccess = () => resolve(request.result);
@@ -171,6 +206,23 @@ class IndexedDBService {
       const request = store.add(change);
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+    });
+  }
+
+  async updatePendingChange(id, change) {
+    const store = await this.getStore(STORES.PENDING_CHANGES, "readwrite");
+    change.updatedAt = new Date().toISOString();
+
+    return new Promise((resolve, reject) => {
+      const request = store.put({ ...change, id });
+      request.onsuccess = () => {
+        OfflineDebugger.log("PENDING_CHANGE_UPDATED", { id, change });
+        resolve(request.result);
+      };
+      request.onerror = () => {
+        OfflineDebugger.error("UPDATE_PENDING_CHANGE_ERROR", request.error);
+        reject(request.error);
+      };
     });
   }
 

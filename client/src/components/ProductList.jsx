@@ -20,6 +20,10 @@ import { useModalManagement } from "../hooks/useModalManagement";
 import { useExpiringProducts } from "../hooks/useExpiringProducts";
 import { isExpiringSoon } from "../utils/dateUtils";
 import { classifyProduct } from "@shared/business/productClassifier";
+import IndexedDB from "../services/indexedDB";
+import OfflineManager from "../services/offlineManager";
+import OfflineDebugger from "../services/offlineDebugger";
+import ConflictResolutionModal from "./ConflictResolutionModal";
 
 const ProductList = () => {
   const navigate = useNavigate();
@@ -46,6 +50,10 @@ const ProductList = () => {
     showThirdDate: false,
     noHayEnAlmacen: false,
   });
+  const [changes, setChanges] = useState([]);
+  const [conflicts, setConflicts] = useState([]);
+  const [isConflictModalOpen, setIsConflictModalOpen] = useState(false);
+  const [isConflictModalClosing, setIsConflictModalClosing] = useState(false);
 
   // Custom Hooks
   const {
@@ -58,7 +66,6 @@ const ProductList = () => {
     handleDeleteProduct,
     handleUndoDelete,
     filterProducts,
-    updateProductInState,
     removeProductFromState,
     addProductToState,
   } = useProductManagement((message, type, data) =>
@@ -290,22 +297,45 @@ const ProductList = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const handleProductStatusUpdate = (data) => {
+    const handleProductStatusUpdate = async (data) => {
       console.log("Recibida actualización de estado:", data);
-      if (data.type === "update" || data.type === "create") {
-        updateProductInState(data.productStatus);
-      } else if (data.type === "delete") {
-        removeProductFromState(data.productId);
+
+      if (data.type === "delete") {
+        // Cuando se elimina un estado, el producto debe moverse a sin clasificar
+        const productToMove = Object.values(products)
+          .flat()
+          .find((p) => p.producto._id === data.productId);
+
+        if (productToMove) {
+          removeProductFromState(data.productId);
+          addProductToState({
+            producto: productToMove.producto,
+            estado: "sin-clasificar",
+            fechaFrente: null,
+            fechaAlmacen: null,
+            fechasAlmacen: [],
+            cajaUnica: false,
+          });
+        }
+      } else if (data.type === "update" || data.type === "create") {
+        // Para otros tipos de actualizaciones
+        if (data.productStatus.producto?._id) {
+          removeProductFromState(data.productStatus.producto._id);
+          addProductToState(data.productStatus);
+        }
       }
     };
 
     const handleCatalogUpdate = (data) => {
       console.log("Recibida actualización de catálogo en ProductList:", data);
       if (data.type === "create" || data.type === "update") {
-        // Para creaciones y actualizaciones, añadimos el producto como sin clasificar
         addProductToState({
           producto: data.product,
           estado: "sin-clasificar",
+          fechaFrente: null,
+          fechaAlmacen: null,
+          fechasAlmacen: [],
+          cajaUnica: false,
         });
       } else if (data.type === "delete") {
         removeProductFromState(data.productId);
@@ -319,10 +349,146 @@ const ProductList = () => {
       socket.off("productStatusUpdate", handleProductStatusUpdate);
       socket.off("catalogUpdate", handleCatalogUpdate);
     };
-  }, [socket, updateProductInState, removeProductFromState, addProductToState]);
+  }, [socket, removeProductFromState, addProductToState, products]);
+
+  useEffect(() => {
+    const loadPendingChanges = async () => {
+      try {
+        const pendingChanges = await IndexedDB.getPendingChanges();
+        setChanges(pendingChanges);
+      } catch (error) {
+        console.error("Error al cargar cambios pendientes:", error);
+      }
+    };
+
+    loadPendingChanges();
+  }, []);
+
+  useEffect(() => {
+    const syncPendingChangesIfOnline = async () => {
+      try {
+        if (OfflineManager.isOnline) {
+          OfflineDebugger.log("ATTEMPTING_AUTO_SYNC");
+          await OfflineManager.syncChanges();
+          // Recargar los cambios pendientes después de sincronizar
+          const pendingChanges = await IndexedDB.getPendingChanges();
+          setChanges(pendingChanges);
+          // Si no hay errores y los cambios se sincronizaron, recargar productos
+          if (pendingChanges.length === 0) {
+            loadAllProducts();
+          }
+        }
+      } catch (error) {
+        console.error("Error en sincronización automática:", error);
+        addToast("Error al sincronizar cambios pendientes", "error");
+      }
+    };
+
+    syncPendingChangesIfOnline();
+  }, [loadAllProducts, addToast]);
+
+  const handleClearPendingChanges = async () => {
+    try {
+      await OfflineManager.clearPendingChanges();
+      setChanges([]); // Limpiar el estado local
+      addToast("Cambios pendientes eliminados correctamente", "success");
+      // Recargar productos para asegurar que tenemos el estado más reciente
+      loadAllProducts();
+    } catch (error) {
+      console.error("Error al limpiar cambios pendientes:", error);
+      addToast("Error al limpiar los cambios pendientes", "error");
+    }
+  };
 
   const groupedProducts = getGroupedExpiringProducts();
   const hasExpiredProducts = groupedProducts.expired.products.length > 0;
+
+  const handleCloseConflictModal = () => {
+    setIsConflictModalClosing(true);
+    setTimeout(() => {
+      setIsConflictModalOpen(false);
+      setIsConflictModalClosing(false);
+    }, 300);
+  };
+
+  const handleResolveConflicts = async (resolutions) => {
+    try {
+      for (const [conflictId, resolution] of Object.entries(resolutions)) {
+        const conflict = conflicts.find((c) => c.id === conflictId);
+        if (!conflict) continue;
+
+        let resolvedData;
+        switch (resolution) {
+          case "local":
+            resolvedData = conflict.data;
+            break;
+          case "server":
+            resolvedData = conflict.conflictData.serverState;
+            break;
+          case "merge":
+            // Combinar datos manteniendo las fechas más recientes
+            resolvedData = {
+              ...conflict.conflictData.serverState,
+              fechaFrente:
+                conflict.data.fechaFrente ||
+                conflict.conflictData.serverState.fechaFrente,
+              fechaAlmacen:
+                conflict.data.fechaAlmacen ||
+                conflict.conflictData.serverState.fechaAlmacen,
+              fechasAlmacen: [
+                ...new Set([
+                  ...(conflict.data.fechasAlmacen || []),
+                  ...(conflict.conflictData.serverState.fechasAlmacen || []),
+                ]),
+              ],
+              version:
+                Math.max(
+                  conflict.data.version,
+                  conflict.conflictData.serverVersion
+                ) + 1,
+            };
+            break;
+          default:
+            continue;
+        }
+
+        // Actualizar el producto con los datos resueltos
+        await handleUpdateProduct(conflict.productId, resolvedData);
+        // Eliminar el cambio pendiente
+        await IndexedDB.removePendingChange(conflictId);
+      }
+
+      // Recargar cambios pendientes y productos
+      const pendingChanges = await IndexedDB.getPendingChanges();
+      setChanges(pendingChanges);
+      loadAllProducts();
+
+      addToast("Conflictos resueltos correctamente", "success");
+    } catch (error) {
+      console.error("Error al resolver conflictos:", error);
+      addToast("Error al resolver los conflictos", "error");
+    }
+  };
+
+  useEffect(() => {
+    const loadConflicts = async () => {
+      try {
+        const pendingChanges = await IndexedDB.getPendingChanges();
+        const conflictChanges = pendingChanges.filter(
+          (change) => change.conflictData
+        );
+        setConflicts(conflictChanges);
+
+        if (conflictChanges.length > 0 && !isConflictModalOpen) {
+          setIsConflictModalOpen(true);
+        }
+      } catch (error) {
+        console.error("Error al cargar conflictos:", error);
+      }
+    };
+
+    loadConflicts();
+  }, [changes]);
 
   return (
     <LoadingErrorContainer
@@ -347,12 +513,29 @@ const ProductList = () => {
           onExpiringClick={() => setIsExpiringModalOpen(true)}
         />
 
-        <SearchBar
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          unclassifiedCount={products["sin-clasificar"].length}
-          onUnclassifiedClick={() => setShowUnclassified(!showUnclassified)}
-        />
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <SearchBar
+              searchTerm={searchTerm}
+              onSearchChange={setSearchTerm}
+              unclassifiedCount={products["sin-clasificar"].length}
+              onUnclassifiedClick={() => setShowUnclassified(!showUnclassified)}
+            />
+          </div>
+          {changes.length > 0 && (
+            <button
+              onClick={handleClearPendingChanges}
+              className="w-full py-2 px-3 text-sm font-medium text-red-600
+                bg-red-50 hover:bg-red-100 rounded-lg transition-colors
+                flex items-center justify-center gap-2"
+            >
+              <span>Limpiar cambios pendientes</span>
+              <span className="text-xs bg-red-100 px-2 py-0.5 rounded-full">
+                {changes.length}
+              </span>
+            </button>
+          )}
+        </div>
 
         {/* Lista de productos sin clasificar */}
         {showUnclassified && (
@@ -422,6 +605,14 @@ const ProductList = () => {
         <CatalogManagement
           isOpen={showCatalogManagement}
           onClose={() => setShowCatalogManagement(false)}
+        />
+
+        <ConflictResolutionModal
+          isOpen={isConflictModalOpen}
+          isClosing={isConflictModalClosing}
+          conflicts={conflicts}
+          onClose={handleCloseConflictModal}
+          onResolveConflicts={handleResolveConflicts}
         />
       </div>
     </LoadingErrorContainer>
