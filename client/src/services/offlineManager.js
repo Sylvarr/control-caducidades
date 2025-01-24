@@ -181,10 +181,16 @@ class OfflineManager {
 
   // Métodos de sincronización
   async syncChanges() {
-    try {
-      OfflineDebugger.log("SYNC_CHANGES_START");
-      const changes = await IndexedDB.getPendingChanges();
+    if (this.syncInProgress) {
+      OfflineDebugger.warn("SYNC_IN_PROGRESS");
+      return;
+    }
 
+    try {
+      this.syncInProgress = true;
+      OfflineDebugger.log("SYNC_STARTED");
+
+      const changes = await IndexedDB.getPendingChanges();
       if (!changes.length) {
         OfflineDebugger.log("NO_PENDING_CHANGES");
         return;
@@ -192,147 +198,170 @@ class OfflineManager {
 
       OfflineDebugger.log("PENDING_CHANGES_FOUND", { count: changes.length });
 
+      // Agrupar cambios por tipo
       const changesByType = changes.reduce((acc, change) => {
         if (!acc[change.type]) acc[change.type] = [];
         acc[change.type].push(change);
         return acc;
       }, {});
 
-      const hasContentChanged = (localData, serverData) => {
-        // Comparar fechas y estado
-        return (
-          localData.fechaFrente !== serverData.fechaFrente ||
-          localData.fechaAlmacen !== serverData.fechaAlmacen ||
-          localData.estado !== serverData.estado ||
-          localData.cajaUnica !== serverData.cajaUnica ||
-          JSON.stringify(localData.fechasAlmacen || []) !==
-            JSON.stringify(serverData.fechasAlmacen || [])
-        );
-      };
-
-      // Procesar cambios de estado de productos
-      if (changesByType.UPDATE) {
-        OfflineDebugger.log("PROCESSING_STATUS_CHANGES", {
-          count: changesByType.UPDATE.length,
-        });
-
-        for (const change of changesByType.UPDATE) {
+      // Procesar primero los cambios del catálogo
+      if (changesByType.CREATE_CATALOG) {
+        for (const change of changesByType.CREATE_CATALOG) {
           try {
-            let serverProduct;
+            OfflineDebugger.log("PROCESSING_CATALOG_CREATE", {
+              tempId: change.tempId,
+              data: change.data,
+            });
+
+            let result;
             try {
-              serverProduct = await http.getProductStatus(change.productId);
-              OfflineDebugger.log("SERVER_PRODUCT_FOUND", {
-                productId: change.productId,
-                serverVersion: serverProduct.version,
-                localVersion: change.data.version,
-              });
-
-              // Detectar diferencia de versiones o contenido
-              if (
-                serverProduct.version !== change.data.version ||
-                (serverProduct.version === change.data.version &&
-                  hasContentChanged(change.data, serverProduct))
-              ) {
-                OfflineDebugger.log("VERSION_DIFFERENCE_DETECTED", {
-                  productId: change.productId,
-                  serverVersion: serverProduct.version,
-                  localVersion: change.data.version,
-                  action: "APPLYING_LOCAL_CHANGES",
-                });
-
-                // Aplicar cambios locales (last-write-wins)
-                await http.updateProductStatus(change.productId, {
-                  ...change.data,
-                  version: serverProduct.version + 1,
-                });
-                await IndexedDB.removePendingChange(change.id);
-                OfflineDebugger.log("LOCAL_CHANGES_APPLIED", {
-                  productId: change.productId,
-                  newVersion: serverProduct.version + 1,
-                });
-                continue;
-              }
-
-              // Si no hay diferencias, actualizar normalmente
-              await http.updateProductStatus(change.productId, {
-                ...change.data,
-                version: serverProduct.version + 1,
-              });
-              await IndexedDB.removePendingChange(change.id);
-              OfflineDebugger.log("PRODUCT_UPDATED", {
-                productId: change.productId,
-                newVersion: serverProduct.version + 1,
-              });
+              result = await http.createCatalogProduct(change.data);
             } catch (error) {
+              // Si el error es de duplicación, intentar obtener el producto existente
               if (
-                error.message.includes("no encontrado") ||
-                error.status === 404
+                error.message.includes("duplicate key error") &&
+                error.message.includes("nombre")
               ) {
-                OfflineDebugger.log("PRODUCT_NOT_FOUND_CREATING", {
-                  productId: change.productId,
+                OfflineDebugger.log("PRODUCT_EXISTS_UPDATING_INSTEAD", {
+                  nombre: change.data.nombre,
                 });
+                // Buscar el producto por nombre
+                const products = await http.getAllCatalogProducts();
+                const existingProduct = products.find(
+                  (p) => p.nombre === change.data.nombre
+                );
 
-                // Usar el cambio pendiente directamente para crear el producto
-                await http.updateProductStatus(change.productId, {
-                  ...change.data,
-                  version: 1, // Asegurar versión inicial
-                });
-
-                await IndexedDB.removePendingChange(change.id);
-                OfflineDebugger.log("PRODUCT_CREATED", {
-                  productId: change.productId,
-                });
+                if (existingProduct) {
+                  // Actualizar el producto existente
+                  result = await http.updateCatalogProduct(
+                    existingProduct._id,
+                    change.data
+                  );
+                } else {
+                  throw error; // Si no lo encontramos, propagar el error original
+                }
               } else {
                 throw error;
               }
             }
+
+            await IndexedDB.saveCatalogProduct({
+              ...result,
+              syncStatus: "synced",
+            });
+
+            await IndexedDB.removePendingChange(change.id);
+
+            // Actualizar el mapeo de IDs
+            if (change.tempId) {
+              await IndexedDB.updateIdMapping(change.tempId, result._id);
+            }
+
+            OfflineDebugger.log("CATALOG_CREATE_PROCESSED", {
+              tempId: change.tempId,
+              permanentId: result._id,
+            });
           } catch (error) {
-            OfflineDebugger.error("STATUS_SYNC_ERROR", error, { change });
-            continue;
+            OfflineDebugger.error("CATALOG_CREATE_ERROR", error, {
+              change,
+            });
           }
         }
       }
 
-      // Procesar eliminaciones
-      if (changesByType.DELETE) {
-        OfflineDebugger.log("PROCESSING_DELETE_CHANGES", {
-          count: changesByType.DELETE.length,
-        });
-
-        for (const change of changesByType.DELETE) {
+      if (changesByType.UPDATE_CATALOG) {
+        for (const change of changesByType.UPDATE_CATALOG) {
           try {
-            await http.deleteProductStatus(change.productId);
+            OfflineDebugger.log("PROCESSING_CATALOG_UPDATE", {
+              productId: change.productId,
+              data: change.data,
+            });
+
+            const result = await http.updateCatalogProduct(
+              change.productId,
+              change.data
+            );
+            await IndexedDB.saveCatalogProduct({
+              ...result,
+              syncStatus: "synced",
+            });
             await IndexedDB.removePendingChange(change.id);
-            OfflineDebugger.log("PRODUCT_DELETED", {
+
+            OfflineDebugger.log("CATALOG_UPDATE_PROCESSED", {
               productId: change.productId,
             });
           } catch (error) {
-            if (
-              error.message.includes("no encontrado") ||
-              error.status === 404
-            ) {
-              // Si el producto ya no existe en el servidor, solo eliminamos el cambio pendiente
-              await IndexedDB.removePendingChange(change.id);
-              OfflineDebugger.log("PRODUCT_ALREADY_DELETED", {
-                productId: change.productId,
-              });
-            } else {
-              OfflineDebugger.error("DELETE_SYNC_ERROR", error, { change });
-            }
+            OfflineDebugger.error("CATALOG_UPDATE_ERROR", error, {
+              change,
+            });
           }
         }
       }
 
-      // Verificar si quedaron cambios sin procesar
-      const remainingChanges = await IndexedDB.getPendingChanges();
-      OfflineDebugger.log("SYNC_CHANGES_COMPLETE", {
-        initialChanges: changes.length,
-        remainingChanges: remainingChanges.length,
-        conflictChanges: remainingChanges.filter((c) => c.conflictData).length,
-      });
+      // Procesar el resto de los cambios
+      for (const change of changes) {
+        if (
+          change.type === "CREATE_CATALOG" ||
+          change.type === "UPDATE_CATALOG"
+        ) {
+          continue; // Ya procesados
+        }
+
+        try {
+          if (change.conflictData) {
+            OfflineDebugger.warn("SKIPPING_CONFLICTED_CHANGE", { change });
+            continue;
+          }
+
+          let serverProduct;
+          let result;
+
+          switch (change.type) {
+            case "UPDATE":
+              serverProduct = await http.getProductStatus(change.productId);
+
+              if (serverProduct.version > change.data.version) {
+                // El servidor tiene una versión más reciente
+                await IndexedDB.saveProductStatus({
+                  ...serverProduct,
+                  syncStatus: "synced",
+                });
+                await IndexedDB.removePendingChange(change.id);
+              } else {
+                result = await http.updateProductStatus(
+                  change.productId,
+                  change.data
+                );
+                await IndexedDB.saveProductStatus({
+                  ...result,
+                  syncStatus: "synced",
+                });
+                await IndexedDB.removePendingChange(change.id);
+              }
+              break;
+
+            case "DELETE":
+              await http.deleteProductStatus(change.productId);
+              await IndexedDB.deleteProductStatus(change.productId);
+              await IndexedDB.removePendingChange(change.id);
+              break;
+
+            default:
+              OfflineDebugger.warn("UNKNOWN_CHANGE_TYPE", {
+                type: change.type,
+              });
+          }
+        } catch (error) {
+          OfflineDebugger.error("SYNC_ERROR", error, { change });
+        }
+      }
+
+      OfflineDebugger.log("SYNC_COMPLETED");
     } catch (error) {
-      OfflineDebugger.error("SYNC_CHANGES_ERROR", error);
-      throw error;
+      OfflineDebugger.error("SYNC_ERROR", error);
+    } finally {
+      this.syncInProgress = false;
     }
   }
 
@@ -434,6 +463,19 @@ class OfflineManager {
       await IndexedDB.saveCatalogProduct(productToSave);
       OfflineDebugger.log("PRODUCT_SAVED_TO_INDEXEDDB", { tempId });
 
+      // Crear estado inicial como "sin clasificar"
+      const initialStatus = {
+        producto: productToSave,
+        estado: "sin-clasificar",
+        fechaFrente: null,
+        fechaAlmacen: null,
+        fechasAlmacen: [],
+        cajaUnica: false,
+        version: 1,
+        updatedAt: new Date().toISOString(),
+      };
+      await IndexedDB.saveProductStatus(initialStatus);
+
       OfflineDebugger.log("CREATING_PENDING_CHANGE", { tempId });
       await IndexedDB.addPendingChange({
         type: "CREATE_CATALOG",
@@ -442,6 +484,18 @@ class OfflineManager {
         timestamp: new Date().toISOString(),
       });
       OfflineDebugger.log("PENDING_CHANGE_CREATED", { tempId });
+
+      // Emitir evento de actualización del catálogo
+      if (window.dispatchEvent) {
+        window.dispatchEvent(
+          new CustomEvent("catalogUpdate", {
+            detail: {
+              type: "create",
+              product: productToSave,
+            },
+          })
+        );
+      }
 
       return productToSave;
     } catch (error) {

@@ -6,6 +6,8 @@ import {
   updateProductStatus,
   deleteProductStatus,
 } from "../services/api";
+import IndexedDB from "../services/indexedDB";
+import OfflineManager from "../services/offlineManager";
 
 export const useProductManagement = (addToast) => {
   const [products, setProducts] = useState(INITIAL_PRODUCTS_STATE);
@@ -19,10 +21,22 @@ export const useProductManagement = (addToast) => {
       setLoading(true);
       setError(null);
 
-      const [statusData, catalogData] = await Promise.all([
-        getAllProductStatus(),
-        getAllCatalogProducts(),
-      ]);
+      let statusData;
+      let catalogData;
+
+      if (OfflineManager.isOnline && !OfflineManager.isOfflineMode) {
+        // Online mode: get data from server
+        [statusData, catalogData] = await Promise.all([
+          getAllProductStatus(),
+          getAllCatalogProducts(),
+        ]);
+      } else {
+        // Offline mode: get data from IndexedDB
+        [statusData, catalogData] = await Promise.all([
+          IndexedDB.getAllProductStatus(),
+          IndexedDB.getAllCatalog(),
+        ]);
+      }
 
       const classifiedProductIds = new Set(
         statusData.map((product) => product.producto._id)
@@ -33,6 +47,10 @@ export const useProductManagement = (addToast) => {
         .map((product) => ({
           producto: product,
           estado: "sin-clasificar",
+          fechaFrente: null,
+          fechaAlmacen: null,
+          fechasAlmacen: [],
+          cajaUnica: false,
         }));
 
       const organizedProducts = {
