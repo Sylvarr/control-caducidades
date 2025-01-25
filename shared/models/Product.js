@@ -17,6 +17,7 @@
  * @property {string} nombre - Nombre del producto
  * @property {boolean} activo - Estado activo/inactivo del producto
  * @property {('permanente'|'promocional')} tipo - Tipo de producto
+ * @property {('almacen'|'nevera')} ubicacion - Ubicación del producto
  * @property {Date} createdAt - Fecha de creación
  * @property {Date} updatedAt - Fecha de última actualización
  */
@@ -49,4 +50,16 @@ export const PRODUCT_TYPES = {
   PERMANENTE: "permanente",
   /** Producto promocional */
   PROMOCIONAL: "promocional",
+};
+
+/**
+ * Ubicaciones posibles de un producto
+ * @readonly
+ * @enum {string}
+ */
+export const PRODUCT_LOCATIONS = {
+  /** Producto almacenado en almacén */
+  ALMACEN: "almacen",
+  /** Producto almacenado en nevera */
+  NEVERA: "nevera",
 };

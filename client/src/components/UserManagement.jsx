@@ -5,6 +5,7 @@ import config from "../config";
 import usePreventScroll from "../hooks/usePreventScroll";
 import ModalContainer from "./ModalContainer";
 import { useSocket } from "../hooks/useSocket";
+import OfflineManager from "../services/offlineManager";
 
 const UserManagement = ({
   isOpen = false,
@@ -28,6 +29,21 @@ const UserManagement = ({
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset all state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setFormData({
+        username: "",
+        password: "",
+        role: "encargado",
+      });
+      setFormErrors({});
+      setIsSubmitting(false);
+      setShowCreateForm(false);
+      setError(null);
+    }
+  }, [isOpen]);
 
   // Cargar usuarios
   const loadUsers = useCallback(async () => {
@@ -146,7 +162,11 @@ const UserManagement = ({
 
     try {
       setIsSubmitting(true);
-      console.log("Enviando datos:", formData);
+
+      // Verificar si estamos offline
+      if (OfflineManager.isOfflineMode) {
+        throw new Error("No se pueden crear usuarios en modo offline");
+      }
 
       const response = await fetch(`${config.apiUrl}/auth/users`, {
         method: "POST",
@@ -175,13 +195,7 @@ const UserManagement = ({
       }
 
       await loadUsers();
-      setShowCreateForm(false);
-      setFormData({
-        username: "",
-        password: "",
-        role: "encargado",
-      });
-      setError(null);
+      resetForm();
     } catch (err) {
       console.error("Error completo:", err);
       setError(
@@ -192,9 +206,26 @@ const UserManagement = ({
     }
   };
 
+  const resetForm = () => {
+    setShowCreateForm(false);
+    setFormData({
+      username: "",
+      password: "",
+      role: "encargado",
+    });
+    setFormErrors({});
+    setError(null);
+    setIsSubmitting(false);
+  };
+
   // Eliminar usuario
   const handleDeleteUser = async (userId) => {
     try {
+      // Verificar si estamos offline
+      if (OfflineManager.isOfflineMode) {
+        throw new Error("No se pueden eliminar usuarios en modo offline");
+      }
+
       setLoading(true);
       const response = await fetch(`${config.apiUrl}/auth/users/${userId}`, {
         method: "DELETE",
@@ -217,14 +248,7 @@ const UserManagement = ({
   };
 
   const handleClose = () => {
-    setError(null);
-    setShowCreateForm(false);
-    setFormData({
-      username: "",
-      password: "",
-      role: "encargado",
-    });
-    setFormErrors({});
+    resetForm();
     onClose();
   };
 

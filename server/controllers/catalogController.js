@@ -101,3 +101,36 @@ export const toggleProductStatus = async (req, res) => {
     });
   }
 };
+
+// Actualizar un producto
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await CatalogProduct.findById(id);
+
+    if (!product) {
+      return res.status(404).json({
+        message: "Producto no encontrado",
+      });
+    }
+
+    // Actualizar campos
+    Object.assign(product, req.body);
+    const updatedProduct = await product.save();
+
+    // Emitir evento de actualización usando la instancia global
+    if (global.io) {
+      global.io.emit("catalogUpdate", {
+        type: "update",
+        product: updatedProduct,
+      });
+    }
+
+    res.json(updatedProduct);
+  } catch (error) {
+    res.status(400).json({
+      message: "Error al actualizar producto",
+      error: error.message,
+    });
+  }
+};

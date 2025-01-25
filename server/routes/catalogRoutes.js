@@ -5,6 +5,7 @@ import {
   addProduct,
   deleteProduct,
   toggleProductStatus,
+  updateProduct,
 } from "../controllers/catalogController.js";
 
 const router = express.Router();
@@ -18,6 +19,7 @@ router.get("/", getAllProducts);
 // Rutas solo para supervisores
 router.post("/", isSupervisor, addProduct);
 router.delete("/:id", isSupervisor, deleteProduct);
+router.put("/:id", isSupervisor, updateProduct);
 router.put("/:id/toggle", isSupervisor, toggleProductStatus);
 
 export default router;

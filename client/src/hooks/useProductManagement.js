@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { INITIAL_PRODUCTS_STATE } from "../constants/productConstants";
 import {
   getAllProductStatus,
-  getAllCatalogProducts,
   updateProductStatus,
   deleteProductStatus,
 } from "../services/api";
@@ -28,7 +27,7 @@ export const useProductManagement = (addToast) => {
         // Online mode: get data from server
         [statusData, catalogData] = await Promise.all([
           getAllProductStatus(),
-          getAllCatalogProducts(),
+          IndexedDB.getAllCatalog(),
         ]);
       } else {
         // Offline mode: get data from IndexedDB
@@ -53,53 +52,66 @@ export const useProductManagement = (addToast) => {
           cajaUnica: false,
         }));
 
-      const organizedProducts = {
-        "sin-clasificar": [
-          ...unclassifiedProducts,
-          ...statusData.filter(
-            (product) => product.estado === "sin-clasificar"
-          ),
-        ],
-        "frente-cambia": statusData.filter(
-          (product) => product.estado === "frente-cambia"
-        ),
-        "frente-agota": statusData.filter(
-          (product) => product.estado === "frente-agota"
-        ),
-        "abierto-cambia": statusData.filter(
-          (product) => product.estado === "abierto-cambia"
-        ),
-        "abierto-agota": statusData.filter(
-          (product) => product.estado === "abierto-agota"
-        ),
-      };
+      const allProducts = [...statusData, ...unclassifiedProducts];
+      const groupedProducts = groupProductsByState(allProducts);
 
-      setProducts(organizedProducts);
-    } catch (err) {
-      setError(err.message || "Error al cargar los productos");
-    } finally {
+      setProducts(groupedProducts);
+      setLoading(false);
+    } catch (error) {
+      console.error("Error al cargar productos:", error);
+      setError(error.message);
       setLoading(false);
     }
   }, []);
 
+  const groupProductsByState = useCallback((productList) => {
+    return productList.reduce((acc, product) => {
+      const estado = product.estado || "sin-clasificar";
+      if (!acc[estado]) {
+        acc[estado] = [];
+      }
+      acc[estado].push(product);
+      return acc;
+    }, {});
+  }, []);
+
   const updateProductInState = useCallback((productData) => {
+    console.log("Actualizando producto en estado:", productData);
+
     setProducts((prevProducts) => {
-      const newProducts = Object.entries(prevProducts).reduce(
-        (acc, [category, productList]) => {
-          acc[category] = productList.filter(
-            (p) => p.producto._id !== productData.producto._id
-          );
-          return acc;
-        },
-        { ...prevProducts }
-      );
+      // 1. Crear una copia profunda del estado actual
+      const newState = { ...prevProducts };
 
+      // 2. Asegurar que existen todas las categorías necesarias
+      const requiredCategories = [
+        "sin-clasificar",
+        "frente-agota",
+        "frente-cambia",
+        "abierto-cambia",
+        "abierto-agota",
+      ];
+      requiredCategories.forEach((category) => {
+        if (!newState[category]) {
+          newState[category] = [];
+        }
+      });
+
+      // 3. Remover el producto de todas las categorías
+      Object.keys(newState).forEach((category) => {
+        newState[category] = newState[category].filter(
+          (p) => p.producto._id !== productData.producto._id
+        );
+      });
+
+      // 4. Añadir el producto a su nueva categoría
       const category = productData.estado || "sin-clasificar";
-      newProducts[category] = [...newProducts[category], productData];
+      newState[category] = [...newState[category], productData];
 
-      return newProducts;
+      console.log("Nuevo estado después de actualización:", newState);
+      return newState;
     });
 
+    // Marcar como último actualizado brevemente
     setLastUpdatedProductId(productData.producto._id);
     setTimeout(() => setLastUpdatedProductId(null), 3000);
   }, []);
@@ -119,12 +131,48 @@ export const useProductManagement = (addToast) => {
   }, []);
 
   const addProductToState = useCallback((productData) => {
+    console.log("Añadiendo producto al estado:", productData);
+
     setProducts((prevProducts) => {
+      // 1. Crear una copia profunda del estado actual
+      const newState = { ...prevProducts };
+
+      // 2. Asegurar que existen todas las categorías necesarias
+      const requiredCategories = [
+        "sin-clasificar",
+        "frente-agota",
+        "frente-cambia",
+        "abierto-cambia",
+        "abierto-agota",
+      ];
+      requiredCategories.forEach((category) => {
+        if (!newState[category]) {
+          newState[category] = [];
+        }
+      });
+
+      // 3. Verificar si el producto ya existe en alguna categoría
+      const existsInAnyCategory = Object.values(newState).some(
+        (categoryProducts) =>
+          categoryProducts.some(
+            (p) => p.producto._id === productData.producto._id
+          )
+      );
+
+      if (existsInAnyCategory) {
+        // 4a. Si existe, actualizar en todas las categorías
+        Object.keys(newState).forEach((category) => {
+          newState[category] = newState[category].filter(
+            (p) => p.producto._id !== productData.producto._id
+          );
+        });
+      }
+
+      // 4b. Añadir el producto a su categoría correspondiente
       const category = productData.estado || "sin-clasificar";
-      return {
-        ...prevProducts,
-        [category]: [...prevProducts[category], productData],
-      };
+      newState[category] = [...newState[category], productData];
+
+      return newState;
     });
 
     setLastUpdatedProductId(productData.producto._id);
@@ -183,14 +231,10 @@ export const useProductManagement = (addToast) => {
       };
       addProductToState(unclassifiedProduct);
 
-      const toastData = {
-        productId: productToDelete.producto._id,
-      };
-
       addToast(
         `${productToDelete.producto.nombre} desclasificado correctamente.`,
         "success",
-        toastData
+        { productId: productToDelete.producto._id }
       );
       return true;
     } catch (error) {
@@ -205,18 +249,15 @@ export const useProductManagement = (addToast) => {
 
   const handleUndoDelete = async (productId) => {
     try {
-      console.log("Intentando restaurar producto:", {
-        productId,
-        lastDeletedProduct,
-        hasLastDeleted: !!lastDeletedProduct,
-      });
-
-      if (!lastDeletedProduct) {
-        throw new Error("No hay producto para restaurar");
-      }
-
-      if (lastDeletedProduct.producto._id !== productId) {
-        throw new Error("El producto no coincide con el último eliminado");
+      if (
+        !lastDeletedProduct ||
+        lastDeletedProduct.producto._id !== productId
+      ) {
+        throw new Error(
+          !lastDeletedProduct
+            ? "No hay producto para restaurar"
+            : "El producto no coincide con el último eliminado"
+        );
       }
 
       const updateData = {
@@ -227,15 +268,14 @@ export const useProductManagement = (addToast) => {
         estado: lastDeletedProduct.estado,
       };
 
-      console.log("Datos de restauración:", updateData);
+      const updatedProduct = await updateProductStatus(productId, updateData);
+      updateProductInState(updatedProduct);
 
-      await updateProductStatus(productId, updateData);
-      await loadAllProducts();
-
-      const nombreProducto = lastDeletedProduct.producto.nombre;
       setLastDeletedProduct(null);
-
-      addToast(`${nombreProducto} restaurado correctamente.`, "success");
+      addToast(
+        `${lastDeletedProduct.producto.nombre} restaurado correctamente.`,
+        "success"
+      );
       return true;
     } catch (error) {
       console.error("Error al deshacer:", error);
@@ -247,7 +287,6 @@ export const useProductManagement = (addToast) => {
   const filterProducts = useCallback(
     (searchTerm) => {
       if (!searchTerm) {
-        // eslint-disable-next-line no-unused-vars
         const { "sin-clasificar": _unused, ...rest } = products;
         return rest;
       }

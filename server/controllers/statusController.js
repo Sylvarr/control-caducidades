@@ -70,15 +70,29 @@ export const updateStatus = async (req, res) => {
       fechaAlmacen,
       fechasAlmacen = [],
       cajaUnica,
+      estado,
     } = req.body;
 
-    // Procesar y validar datos usando la lógica compartida
-    const processedData = processProduct({
-      fechaFrente,
-      fechaAlmacen,
-      fechasAlmacen,
-      cajaUnica: Boolean(cajaUnica),
-    });
+    let processedData;
+
+    // Si se proporciona un estado explícito y no hay fechas, usar ese estado
+    if (estado === "sin-clasificar" && !fechaFrente && !fechaAlmacen) {
+      processedData = {
+        estado: "sin-clasificar",
+        fechaFrente: null,
+        fechaAlmacen: null,
+        fechasAlmacen: [],
+        cajaUnica: false,
+      };
+    } else {
+      // Procesar y validar datos usando la lógica compartida
+      processedData = processProduct({
+        fechaFrente,
+        fechaAlmacen,
+        fechasAlmacen,
+        cajaUnica: Boolean(cajaUnica),
+      });
+    }
 
     console.log("Datos procesados:", processedData);
 

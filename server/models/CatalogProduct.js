@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
-import { PRODUCT_TYPES } from "../../shared/models/Product.js";
+import {
+  PRODUCT_TYPES,
+  PRODUCT_LOCATIONS,
+} from "../../shared/models/Product.js";
 
 const catalogProductSchema = new mongoose.Schema(
   {
@@ -16,6 +19,12 @@ const catalogProductSchema = new mongoose.Schema(
       type: String,
       enum: Object.values(PRODUCT_TYPES),
       default: PRODUCT_TYPES.PERMANENTE,
+    },
+    ubicacion: {
+      type: String,
+      enum: Object.values(PRODUCT_LOCATIONS),
+      default: PRODUCT_LOCATIONS.ALMACEN,
+      required: true,
     },
   },
   {

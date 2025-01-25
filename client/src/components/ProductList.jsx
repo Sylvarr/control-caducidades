@@ -68,6 +68,7 @@ const ProductList = () => {
     filterProducts,
     removeProductFromState,
     addProductToState,
+    updateProductInState,
   } = useProductManagement((message, type, data) =>
     addToast(message, type, data)
   );
@@ -295,71 +296,56 @@ const ProductList = () => {
   }, [selectedProduct]);
 
   useEffect(() => {
-    if (!socket) return;
-
     const handleProductStatusUpdate = async (data) => {
       console.log("Recibida actualización de estado:", data);
 
-      if (data.type === "delete") {
-        // Cuando se elimina un estado, el producto debe moverse a sin clasificar
-        const productToMove = Object.values(products)
-          .flat()
-          .find((p) => p.producto._id === data.productId);
-
-        if (productToMove) {
-          removeProductFromState(data.productId);
-          addProductToState({
-            producto: productToMove.producto,
-            estado: "sin-clasificar",
-            fechaFrente: null,
-            fechaAlmacen: null,
-            fechasAlmacen: [],
-            cajaUnica: false,
-          });
-        }
-      } else if (data.type === "update" || data.type === "create") {
-        // Para otros tipos de actualizaciones
-        if (data.productStatus.producto?._id) {
-          removeProductFromState(data.productStatus.producto._id);
-          addProductToState(data.productStatus);
-        }
+      if (data.type === "update" && data.productStatus) {
+        updateProductInState(data.productStatus);
+      } else if (data.type === "delete" && data.productId) {
+        removeProductFromState(data.productId);
+      } else if (data.type === "create" && data.productStatus) {
+        addProductToState(data.productStatus);
       }
     };
 
     const handleCatalogUpdate = (data) => {
-      console.log("Recibida actualización de catálogo en ProductList:", data);
+      console.log("Recibida actualización de catálogo:", data);
+
       if (data.type === "create" || data.type === "update") {
-        // En lugar de solo añadir el producto, recargamos todos los productos
-        // para asegurar que tenemos el estado más actualizado
-        loadAllProducts();
+        const unclassifiedProduct = {
+          producto: data.product,
+          estado: "sin-clasificar",
+          fechaFrente: null,
+          fechaAlmacen: null,
+          fechasAlmacen: [],
+          cajaUnica: false,
+        };
+        addProductToState(unclassifiedProduct);
       } else if (data.type === "delete") {
         removeProductFromState(data.productId);
       }
     };
 
-    socket.on("productStatusUpdate", handleProductStatusUpdate);
-    socket.on("catalogUpdate", handleCatalogUpdate);
-
-    // Escuchar eventos del DOM para actualizaciones offline
     const handleOfflineCatalogUpdate = (event) => {
       console.log("Recibida actualización offline del catálogo:", event.detail);
       handleCatalogUpdate(event.detail);
     };
 
+    if (socket) {
+      socket.on("productStatusUpdate", handleProductStatusUpdate);
+      socket.on("catalogUpdate", handleCatalogUpdate);
+    }
+
     window.addEventListener("catalogUpdate", handleOfflineCatalogUpdate);
 
     return () => {
-      socket.off("productStatusUpdate", handleProductStatusUpdate);
-      socket.off("catalogUpdate", handleCatalogUpdate);
+      if (socket) {
+        socket.off("productStatusUpdate", handleProductStatusUpdate);
+        socket.off("catalogUpdate", handleCatalogUpdate);
+      }
       window.removeEventListener("catalogUpdate", handleOfflineCatalogUpdate);
     };
-  }, [
-    socket,
-    products,
-    removeProductFromState,
-    addProductToState,
-    loadAllProducts,
-  ]);
+  }, [socket, updateProductInState, removeProductFromState, addProductToState]);
 
   useEffect(() => {
     const loadPendingChanges = async () => {

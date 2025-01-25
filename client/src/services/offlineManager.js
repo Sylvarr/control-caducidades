@@ -198,7 +198,7 @@ class OfflineManager {
 
       OfflineDebugger.log("PENDING_CHANGES_FOUND", { count: changes.length });
 
-      // Agrupar cambios por tipo
+      // Procesar primero los cambios del catálogo
       const changesByType = changes.reduce((acc, change) => {
         if (!acc[change.type]) acc[change.type] = [];
         acc[change.type].push(change);
@@ -314,31 +314,36 @@ class OfflineManager {
             continue;
           }
 
-          let serverProduct;
           let result;
 
           switch (change.type) {
             case "UPDATE":
-              serverProduct = await http.getProductStatus(change.productId);
-
-              if (serverProduct.version > change.data.version) {
-                // El servidor tiene una versión más reciente
-                await IndexedDB.saveProductStatus({
-                  ...serverProduct,
-                  syncStatus: "synced",
-                });
-                await IndexedDB.removePendingChange(change.id);
-              } else {
+              try {
+                // Intentar actualizar directamente sin verificación previa
                 result = await http.updateProductStatus(
                   change.productId,
                   change.data
                 );
-                await IndexedDB.saveProductStatus({
-                  ...result,
-                  syncStatus: "synced",
-                });
-                await IndexedDB.removePendingChange(change.id);
+              } catch (error) {
+                // Si el error es 404, crear nuevo estado
+                if (error.message.includes("Estado no encontrado")) {
+                  OfflineDebugger.log("CREATING_NEW_PRODUCT_STATUS", {
+                    productId: change.productId,
+                  });
+                  result = await http.createProductStatus({
+                    ...change.data,
+                    _id: change.productId, // Asegurar que usamos el mismo ID
+                  });
+                } else {
+                  throw error;
+                }
               }
+
+              await IndexedDB.saveProductStatus({
+                ...result,
+                syncStatus: "synced",
+              });
+              await IndexedDB.removePendingChange(change.id);
               break;
 
             case "DELETE":

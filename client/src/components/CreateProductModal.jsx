@@ -1,20 +1,44 @@
-import { useState, useCallback } from "react";
-import { PackagePlus, X, RefreshCw } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
+import {
+  PackagePlus,
+  X,
+  RefreshCw,
+  Warehouse,
+  Snowflake,
+  Pencil,
+} from "lucide-react";
 import PropTypes from "prop-types";
 import usePreventScroll from "../hooks/usePreventScroll";
-import OfflineManager from "../services/offlineManager";
+import { createCatalogProduct, updateCatalogProduct } from "../services/api";
 
-const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
+const CreateProductModal = ({
+  isOpen,
+  onClose,
+  onProductCreated,
+  editingProduct,
+}) => {
   // Usar el hook para prevenir scroll
   usePreventScroll(isOpen);
 
   const [formData, setFormData] = useState({
     nombre: "",
     tipo: "permanente",
+    ubicacion: "almacen",
   });
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Cargar datos del producto a editar
+  useEffect(() => {
+    if (editingProduct) {
+      setFormData({
+        nombre: editingProduct.nombre,
+        tipo: editingProduct.tipo,
+        ubicacion: editingProduct.ubicacion || "almacen",
+      });
+    }
+  }, [editingProduct]);
 
   // Validación en tiempo real
   const validateForm = useCallback((data) => {
@@ -44,8 +68,8 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
     [formData, validateForm]
   );
 
-  // Crear producto
-  const handleCreateProduct = async (e) => {
+  // Crear o actualizar producto
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errors = validateForm(formData);
 
@@ -56,9 +80,13 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
 
     try {
       setIsSubmitting(true);
-      await OfflineManager.createCatalogProduct(formData);
+      if (editingProduct) {
+        await updateCatalogProduct(editingProduct._id, formData);
+      } else {
+        await createCatalogProduct(formData);
+      }
       await onProductCreated();
-      handleClose();
+      onClose();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -67,7 +95,7 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
   };
 
   const handleClose = () => {
-    setFormData({ nombre: "", tipo: "permanente" });
+    setFormData({ nombre: "", tipo: "permanente", ubicacion: "almacen" });
     setFormErrors({});
     setError(null);
     onClose();
@@ -93,9 +121,15 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <PackagePlus className="w-5 h-5 text-[#1d5030]" />
+            {editingProduct ? (
+              <Pencil className="w-5 h-5 text-[#1d5030]" />
+            ) : (
+              <PackagePlus className="w-5 h-5 text-[#1d5030]" />
+            )}
             <h2 className="text-lg font-bold text-[#1d5030]">
-              Añadir nuevo producto
+              {editingProduct
+                ? `Editar "${editingProduct.nombre}"`
+                : "Añadir nuevo producto"}
             </h2>
           </div>
           <button
@@ -117,9 +151,10 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
             </div>
           )}
 
-          <form onSubmit={handleCreateProduct} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Nombre del Producto */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 px-1">
                 Nombre del Producto
               </label>
               <input
@@ -127,38 +162,111 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
                 name="nombre"
                 value={formData.nombre}
                 onChange={handleInputChange}
-                className={`w-full px-3 py-2 border rounded-md
+                className={`w-full h-12 px-4 border rounded-lg
                   ${formErrors.nombre ? "border-red-500" : "border-gray-300"}
-                  focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50`}
+                  focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50
+                  text-base`}
+                placeholder="Ej: Café descafeinado"
               />
               {formErrors.nombre && (
-                <p className="mt-1 text-sm text-red-500">{formErrors.nombre}</p>
+                <p className="mt-1 text-sm text-red-500 px-1">
+                  {formErrors.nombre}
+                </p>
               )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            {/* Tipo de Producto */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 px-1">
                 Tipo
               </label>
-              <select
-                name="tipo"
-                value={formData.tipo}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md
-                  focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50"
-              >
-                <option value="permanente">Permanente</option>
-                <option value="promocional">Promocional</option>
-              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, tipo: "permanente" }))
+                  }
+                  className={`h-12 flex items-center justify-center rounded-lg
+                    font-medium transition-all duration-200
+                    ${
+                      formData.tipo === "permanente"
+                        ? "bg-gray-200 text-gray-800 border-2 border-gray-400"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }
+                    active:scale-95`}
+                >
+                  Permanente
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, tipo: "promocional" }))
+                  }
+                  className={`h-12 flex items-center justify-center rounded-lg
+                    font-medium transition-all duration-200
+                    ${
+                      formData.tipo === "promocional"
+                        ? "bg-gray-200 text-gray-800 border-2 border-gray-400"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }
+                    active:scale-95`}
+                >
+                  Promocional
+                </button>
+              </div>
             </div>
 
+            {/* Ubicación */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 px-1">
+                Ubicación
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, ubicacion: "almacen" }))
+                  }
+                  className={`h-12 flex items-center justify-center gap-2 rounded-lg
+                    font-medium transition-all duration-200
+                    ${
+                      formData.ubicacion === "almacen"
+                        ? "bg-gray-200 text-gray-800 border-2 border-gray-400"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }
+                    active:scale-95`}
+                >
+                  <Warehouse className="w-4 h-4" />
+                  Almacén
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFormData((prev) => ({ ...prev, ubicacion: "nevera" }))
+                  }
+                  className={`h-12 flex items-center justify-center gap-2 rounded-lg
+                    font-medium transition-all duration-200
+                    ${
+                      formData.ubicacion === "nevera"
+                        ? "bg-gray-200 text-gray-800 border-2 border-gray-400"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }
+                    active:scale-95`}
+                >
+                  <Snowflake className="w-4 h-4" />
+                  Nevera
+                </button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700
-                  bg-gray-50 hover:bg-gray-100
-                  rounded-md transition-colors"
+                className="h-12 px-6 bg-gray-100 text-gray-600 rounded-lg
+                  font-medium transition-all duration-200
+                  hover:bg-gray-200 active:scale-95"
               >
                 Cancelar
               </button>
@@ -169,17 +277,20 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
                   !formData.nombre ||
                   Object.values(formErrors).some(Boolean)
                 }
-                className="px-4 py-2 text-sm font-medium text-white
-                  bg-[#1d5030] hover:bg-[#1d5030]/90
-                  rounded-md transition-colors
+                className="h-12 px-6 bg-[#1d5030] text-white rounded-lg
+                  font-medium shadow-sm hover:shadow-md
+                  hover:bg-[#1d5030]/90 transition-all duration-200
                   disabled:opacity-50 disabled:cursor-not-allowed
-                  flex items-center gap-2"
+                  flex items-center justify-center gap-2
+                  active:scale-95"
               >
                 {isSubmitting ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Creando...
+                    {editingProduct ? "Guardando..." : "Creando..."}
                   </>
+                ) : editingProduct ? (
+                  "Guardar Cambios"
                 ) : (
                   "Crear Producto"
                 )}
@@ -196,6 +307,12 @@ CreateProductModal.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
   onProductCreated: PropTypes.func.isRequired,
+  editingProduct: PropTypes.shape({
+    _id: PropTypes.string.isRequired,
+    nombre: PropTypes.string.isRequired,
+    tipo: PropTypes.string.isRequired,
+    ubicacion: PropTypes.string,
+  }),
 };
 
 export default CreateProductModal;

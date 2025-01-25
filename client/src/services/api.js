@@ -183,6 +183,10 @@ export const updateProductStatus = (productId, data) =>
   OfflineManager.updateProductStatus(productId, data);
 export const getAllCatalogProducts = () =>
   OfflineManager.getAllCatalogProducts();
+export const createCatalogProduct = (data) =>
+  OfflineManager.createCatalogProduct(data);
+export const updateCatalogProduct = (productId, data) =>
+  OfflineManager.updateCatalogProduct(productId, data);
 export const deleteProductStatus = (productId) =>
   OfflineManager.deleteProductStatus(productId);
 export const deleteProduct = (productId) =>

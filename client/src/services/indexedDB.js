@@ -258,10 +258,34 @@ class IndexedDBService {
     const store = await this.getStore(STORES.CATALOG, "readwrite");
     product.updatedAt = new Date().toISOString();
 
+    // Inicializar o incrementar versión
+    if (!product.version) {
+      product.version = 1;
+    } else if (product._isLocalUpdate) {
+      // Solo incrementar versión si es una actualización local
+      product.version++;
+      delete product._isLocalUpdate;
+    }
+
+    // Asegurar que el producto tenga un estado de sincronización
+    if (!product.syncStatus) {
+      product.syncStatus = "pending";
+    }
+
+    OfflineDebugger.log("SAVE_CATALOG_PRODUCT", {
+      productId: product._id,
+      version: product.version,
+      syncStatus: product.syncStatus,
+      isLocalUpdate: product._isLocalUpdate,
+    });
+
     return new Promise((resolve, reject) => {
       const request = store.put(product);
       request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onerror = () => {
+        OfflineDebugger.error("SAVE_CATALOG_PRODUCT_ERROR", request.error);
+        reject(request.error);
+      };
     });
   }
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Package,
   PackagePlus,
@@ -7,12 +7,13 @@ import {
   RefreshCw,
   Tag,
   Search,
+  Pencil,
 } from "lucide-react";
 import PropTypes from "prop-types";
 import CreateProductModal from "./CreateProductModal";
-import { useSocket } from "../hooks/useSocket";
 import OfflineManager from "../services/offlineManager";
 import usePreventScroll from "../hooks/usePreventScroll";
+import { useCatalogManagement } from "../hooks/useCatalogManagement";
 
 const TYPE_STYLES = {
   permanente: {
@@ -29,14 +30,20 @@ const CatalogManagement = ({ isOpen, onClose }) => {
   // Usar el hook para prevenir scroll
   usePreventScroll(isOpen);
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductId, setSelectedProductId] = useState(null);
-  const { socket } = useSocket();
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [error, setError] = useState(null);
+
+  const {
+    products,
+    loading,
+    error: catalogError,
+    loadProducts,
+    handleProductUpdate,
+  } = useCatalogManagement();
 
   // Filtrar y agrupar productos
   const groupedProducts = useMemo(() => {
@@ -50,23 +57,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
     };
   }, [products, searchTerm]);
 
-  // Cargar productos
-  const loadProducts = useCallback(async () => {
-    try {
-      setLoading(true);
-      console.log("Intentando cargar productos...");
-      const data = await OfflineManager.getAllCatalogProducts();
-      console.log("Datos recibidos:", data);
-      setProducts(data);
-      setError(null);
-    } catch (err) {
-      console.error("Error completo al cargar productos:", err);
-      setError(err.message || "Error al cargar el catálogo");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // Cargar productos inicialmente
   useEffect(() => {
     if (isOpen) {
       loadProducts();
@@ -76,20 +67,21 @@ const CatalogManagement = ({ isOpen, onClose }) => {
   // Eliminar producto
   const handleDeleteProduct = async (productId) => {
     try {
-      setLoading(true);
       console.log("Intentando eliminar producto:", productId);
-
       await OfflineManager.deleteCatalogProduct(productId);
-      await loadProducts();
       setDeleteConfirm(null);
-      setError(null);
     } catch (err) {
-      console.error("Error completo al eliminar:", err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
+      console.error("Error al eliminar:", err);
+      setError(err.message || "Error al eliminar el producto");
     }
   };
+
+  const handleClose = useCallback(() => {
+    setSelectedProductId(null);
+    setDeleteConfirm(null);
+    setEditingProduct(null);
+    onClose();
+  }, [onClose]);
 
   // Renderizar producto
   const renderProduct = (product) => (
@@ -123,9 +115,10 @@ const CatalogManagement = ({ isOpen, onClose }) => {
               e.stopPropagation();
               handleDeleteProduct(product._id);
             }}
-            className="px-3 py-1 bg-red-600 text-white text-sm rounded
-              hover:bg-red-700 transition-colors"
+            className="h-10 px-4 bg-red-600 text-white rounded-lg
+              hover:bg-red-700 transition-colors flex items-center gap-2"
           >
+            <Trash2 className="w-5 h-5" />
             Confirmar
           </button>
           <button
@@ -133,7 +126,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
               e.stopPropagation();
               setDeleteConfirm(null);
             }}
-            className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded
+            className="h-10 px-4 bg-gray-200 text-gray-700 rounded-lg
               hover:bg-gray-300 transition-colors"
           >
             Cancelar
@@ -141,36 +134,32 @@ const CatalogManagement = ({ isOpen, onClose }) => {
         </div>
       ) : (
         selectedProductId === product._id && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeleteConfirm(product._id);
-            }}
-            className="p-2 text-gray-400 hover:text-red-600 transition-colors
-            rounded-full hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingProduct(product);
+              }}
+              className="h-10 w-10 flex items-center justify-center text-gray-600 
+                hover:text-gray-900 hover:bg-gray-200 transition-colors rounded-lg"
+            >
+              <Pencil className="w-5 h-5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeleteConfirm(product._id);
+              }}
+              className="h-10 w-10 flex items-center justify-center text-gray-600
+                hover:text-red-600 hover:bg-red-50 transition-colors rounded-lg"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+          </div>
         )
       )}
     </div>
   );
-
-  // Efecto para manejar eventos de WebSocket
-  useEffect(() => {
-    if (!socket) return;
-
-    const handleCatalogUpdate = async (data) => {
-      console.log("Recibida actualización de catálogo:", data);
-      await loadProducts(); // Recargar todos los productos en lugar de manipular el estado directamente
-    };
-
-    socket.on("catalogUpdate", handleCatalogUpdate);
-
-    return () => {
-      socket.off("catalogUpdate", handleCatalogUpdate);
-    };
-  }, [socket, loadProducts]);
 
   if (!isOpen) return null;
 
@@ -183,7 +172,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
         <div
           className="fixed inset-0 bg-black/50 
             animate-[fadeIn_0.2s_ease-out]"
-          onClick={onClose}
+          onClick={handleClose}
         />
 
         <div
@@ -200,7 +189,7 @@ const CatalogManagement = ({ isOpen, onClose }) => {
               </h2>
             </div>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"
             >
               <X className="w-5 h-5 text-gray-500" />
@@ -309,10 +298,20 @@ const CatalogManagement = ({ isOpen, onClose }) => {
         </div>
       </div>
 
+      {/* Create/Edit Modal */}
       <CreateProductModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onProductCreated={loadProducts}
+        isOpen={showCreateModal || editingProduct !== null}
+        onClose={() => {
+          setShowCreateModal(false);
+          setEditingProduct(null);
+        }}
+        onProductCreated={(updatedProduct) => {
+          console.log("Producto creado/actualizado:", updatedProduct);
+          if (updatedProduct) {
+            handleProductUpdate(updatedProduct);
+          }
+        }}
+        editingProduct={editingProduct}
       />
     </>
   );
@@ -322,4 +321,5 @@ CatalogManagement.propTypes = {
   isOpen: PropTypes.bool.isRequired,
   onClose: PropTypes.func.isRequired,
 };
+
 export default CatalogManagement;

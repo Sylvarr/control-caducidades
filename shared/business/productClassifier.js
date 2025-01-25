@@ -18,29 +18,34 @@ function classifyProduct({
   fechasAlmacen = [],
   cajaUnica = false,
 }) {
-  // Validar fechas requeridas
-  if (!fechaFrente) {
-    throw new Error("La fecha de frente es requerida");
+  // Si no hay fechas, el producto está sin clasificar
+  if (
+    !fechaFrente &&
+    !fechaAlmacen &&
+    (!fechasAlmacen || fechasAlmacen.length === 0)
+  ) {
+    return PRODUCT_STATES.SIN_CLASIFICAR;
   }
 
-  // Si no hay fecha de almacén, es "frente-agota"
-  if (!fechaAlmacen) {
-    return PRODUCT_STATES.FRENTE_AGOTA;
-  }
+  // Si hay fecha de frente, aplicar la lógica normal
+  if (fechaFrente) {
+    // Si no hay fecha de almacén, es "frente-agota"
+    if (!fechaAlmacen) {
+      return PRODUCT_STATES.FRENTE_AGOTA;
+    }
 
-  // Si las fechas son diferentes, es "frente-cambia"
-  if (!areDatesEqual(fechaFrente, fechaAlmacen)) {
-    return PRODUCT_STATES.FRENTE_CAMBIA;
-  }
+    // Si las fechas son diferentes, es "frente-cambia"
+    if (!areDatesEqual(fechaFrente, fechaAlmacen)) {
+      return PRODUCT_STATES.FRENTE_CAMBIA;
+    }
 
-  // Si las fechas coinciden
-  if (areDatesEqual(fechaFrente, fechaAlmacen)) {
-    if (cajaUnica) {
-      return PRODUCT_STATES.ABIERTO_AGOTA;
-    } else if (fechasAlmacen && fechasAlmacen.length > 0) {
-      return PRODUCT_STATES.ABIERTO_CAMBIA;
-    } else {
-      return PRODUCT_STATES.SIN_CLASIFICAR;
+    // Si las fechas coinciden
+    if (areDatesEqual(fechaFrente, fechaAlmacen)) {
+      if (cajaUnica) {
+        return PRODUCT_STATES.ABIERTO_AGOTA;
+      } else if (fechasAlmacen && fechasAlmacen.length > 0) {
+        return PRODUCT_STATES.ABIERTO_CAMBIA;
+      }
     }
   }
 
