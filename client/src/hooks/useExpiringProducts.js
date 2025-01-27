@@ -1,12 +1,16 @@
 import { useCallback } from "react";
 import { getDaysUntilExpiry, isExpiringSoon } from "../utils/dateUtils";
+import { PRODUCT_STATES } from "@shared/models/Product";
 
 export const useExpiringProducts = (products) => {
   const calculateExpiringProducts = useCallback(() => {
     let count = 0;
     Object.values(products).forEach((productList) => {
       productList.forEach((product) => {
-        if (isExpiringSoon(product.fechaFrente)) {
+        if (
+          product.estado !== PRODUCT_STATES.SIN_CLASIFICAR &&
+          isExpiringSoon(product.fechaFrente)
+        ) {
           count++;
         }
       });
@@ -18,12 +22,14 @@ export const useExpiringProducts = (products) => {
     const expiringProducts = [];
     Object.values(products).forEach((productList) => {
       productList.forEach((product) => {
-        const daysUntil = getDaysUntilExpiry(product.fechaFrente);
-        if (daysUntil <= 14) {
-          expiringProducts.push({
-            ...product,
-            daysUntilExpiry: daysUntil,
-          });
+        if (product.estado !== PRODUCT_STATES.SIN_CLASIFICAR) {
+          const daysUntil = getDaysUntilExpiry(product.fechaFrente);
+          if (daysUntil <= 14) {
+            expiringProducts.push({
+              ...product,
+              daysUntilExpiry: daysUntil,
+            });
+          }
         }
       });
     });
