@@ -90,27 +90,72 @@ export const useProductManagement = (addToast) => {
     setProducts((prevProducts) => {
       return Object.entries(prevProducts).reduce(
         (acc, [category, productList]) => {
-          acc[category] = productList.filter(
-            (p) => p.producto._id !== productId
-          );
+          acc[category] = productList.filter((p) => {
+            // Comprobar si el producto está en un estado
+            if (p.producto && p.producto._id) {
+              return p.producto._id !== productId;
+            }
+            // Comprobar si el producto está en el catálogo
+            if (p._id) {
+              return p._id !== productId;
+            }
+            // Si no tiene ID, mantenerlo (no debería ocurrir)
+            return true;
+          });
           return acc;
         },
         { ...prevProducts }
       );
     });
+
+    // Limpiar el último producto eliminado
+    setLastDeletedProduct(null);
   }, []);
 
   const addProductToState = useCallback((productData) => {
     setProducts((prevProducts) => {
-      const category = productData.estado || "sin-clasificar";
+      // Si el producto ya tiene un estado, usarlo directamente
+      if (productData.estado) {
+        const category = productData.estado;
+        // Verificar si el producto ya existe en la categoría
+        const exists = prevProducts[category].some(
+          (p) => p.producto._id === productData.producto._id
+        );
+        if (exists) return prevProducts;
+
+        return {
+          ...prevProducts,
+          [category]: [...prevProducts[category], productData],
+        };
+      }
+
+      // Si es un producto del catálogo, añadirlo como sin clasificar
+      const unclassifiedProduct = {
+        producto: productData,
+        estado: "sin-clasificar",
+      };
+
+      // Verificar si el producto ya existe en sin-clasificar
+      // Primero verificar por ID exacto
+      const existsById = prevProducts["sin-clasificar"].some(
+        (p) => p.producto._id === productData._id
+      );
+      
+      // Luego verificar si hay algún producto con nombre idéntico y tipo temporal
+      // Esto ayuda a prevenir duplicados cuando se sincronizan productos temporales
+      const existsByName = productData.nombre && prevProducts["sin-clasificar"].some(
+        (p) => 
+          p.producto.nombre === productData.nombre && 
+          (p.producto._id.startsWith('temp_') || productData._id.startsWith('temp_'))
+      );
+      
+      if (existsById || existsByName) return prevProducts;
+
       return {
         ...prevProducts,
-        [category]: [...prevProducts[category], productData],
+        "sin-clasificar": [...prevProducts["sin-clasificar"], unclassifiedProduct],
       };
     });
-
-    setLastUpdatedProductId(productData.producto._id);
-    setTimeout(() => setLastUpdatedProductId(null), 3000);
   }, []);
 
   const handleUpdateProduct = async (productId, updateData) => {

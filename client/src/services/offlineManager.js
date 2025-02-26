@@ -150,7 +150,7 @@ class OfflineManager {
 
       if (this.isOnline && !this.isOfflineMode) {
         const result = await api.http.deleteProductStatus(productId);
-        // Asegurar que se elimina de IndexedDB
+        // Asegurar que se elimine de IndexedDB
         await IndexedDB.deleteProductStatus(productId);
         return result;
       }
@@ -193,10 +193,9 @@ class OfflineManager {
       });
 
       if (this.isOnline && !this.isOfflineMode) {
-        const data = await api.http.getAllCatalogProducts();
-        OfflineDebugger.log("CATALOG_SERVER_RESPONSE", { count: data.length });
-        await this.saveCatalogToLocalStorage(data);
-        return data;
+        const serverData = await api.http.getAllCatalogProducts();
+        await this.saveCatalogToLocalStorage(serverData);
+        return serverData;
       }
 
       const localData = await IndexedDB.getAllCatalog();
@@ -206,6 +205,7 @@ class OfflineManager {
       return localData;
     } catch (error) {
       OfflineDebugger.error("GET_CATALOG_ERROR", error);
+      // Si hay un error, intentar obtener datos locales como fallback
       return await IndexedDB.getAllCatalog();
     }
   }
@@ -224,58 +224,129 @@ class OfflineManager {
         return;
       }
 
-      // Primero sincronizar productos del catálogo
-      const catalogChanges = changes.filter(
-        (change) => change.type === "CREATE_CATALOG"
-      );
-
       // Mapa para guardar la relación entre IDs temporales y permanentes
       const idMapping = new Map();
 
-      // Procesar creaciones de productos primero
-      for (const change of catalogChanges) {
+      // Primero procesar las creaciones del catálogo
+      const createChanges = changes.filter(
+        (change) => change.type === "CREATE_CATALOG"
+      );
+
+      for (const change of createChanges) {
         try {
+          OfflineDebugger.log("PROCESSING_CREATE_CATALOG_CHANGE", {
+            change,
+            tempId: change.tempId,
+            productId: change.productId
+          });
+          
           const response = await this.processChange(change);
-          if (response && response._id && change.tempId) {
-            idMapping.set(change.tempId, response._id);
+          if (response && response._id) {
+            // Guardar la relación entre ID temporal y permanente
+            if (change.tempId) {
+              idMapping.set(change.tempId, response._id);
+              
+              // También mapear el productId si existe y es diferente del tempId
+              if (change.productId && change.productId !== change.tempId) {
+                idMapping.set(change.productId, response._id);
+              }
+            } else if (change.productId) {
+              // Si no hay tempId pero hay productId, usar ese
+              idMapping.set(change.productId, response._id);
+            }
+            
             await IndexedDB.removePendingChange(change.id);
 
+            // Notificar a la UI que elimine el producto temporal
+            const tempIdToRemove = change.tempId || change.productId;
+            if (tempIdToRemove) {
+              window.dispatchEvent(
+                new CustomEvent("localCatalogUpdate", {
+                  detail: {
+                    type: "delete",
+                    productId: tempIdToRemove,
+                  },
+                })
+              );
+            }
+
             // Actualizar el producto en IndexedDB con su nuevo ID
-            await IndexedDB.updateCatalogProduct(change.tempId, {
-              ...response,
-              _id: response._id,
-            });
+            const oldId = change.tempId || change.productId;
+            if (oldId) {
+              await IndexedDB.updateCatalogProduct(oldId, {
+                ...response,
+                _id: response._id,
+              });
+            }
+
+            // Notificar a la UI que añada el producto con ID permanente
+            window.dispatchEvent(
+              new CustomEvent("localCatalogUpdate", {
+                detail: {
+                  type: "create",
+                  product: response,
+                },
+              })
+            );
           }
         } catch (error) {
           OfflineDebugger.error("SYNC_CHANGE_ERROR", { change, error });
         }
       }
 
-      // Actualizar referencias en estados pendientes
+      // Procesar los cambios restantes
       const remainingChanges = changes.filter(
-        (change) => !catalogChanges.includes(change)
+        (change) => !createChanges.includes(change)
       );
+
       for (const change of remainingChanges) {
-        if (change.productId && change.productId.startsWith("temp_")) {
-          const permanentId = idMapping.get(change.productId);
-          if (permanentId) {
-            // Actualizar tanto el productId como la referencia en los datos
-            change.productId = permanentId;
-            if (change.data && change.data.producto) {
-              change.data.producto = permanentId;
-            }
-          } else {
-            OfflineDebugger.log("SKIPPING_CHANGE", {
-              reason: "No permanent ID found",
-              change,
-            });
+        try {
+          // Si es un DELETE de un producto temporal, simplemente limpiarlo localmente
+          if (change.type === "DELETE_CATALOG" && change.productId.startsWith("temp_")) {
+            // Eliminar el cambio pendiente y el producto de IndexedDB
+            await IndexedDB.removePendingChange(change.id);
+            await IndexedDB.deleteCatalogProduct(change.productId);
             continue;
           }
-        }
 
-        try {
-          await this.processChange(change);
-          await IndexedDB.removePendingChange(change.id);
+          // Para otros cambios, actualizar el ID si es necesario
+          if (change.productId && change.productId.startsWith("temp_")) {
+            const permanentId = idMapping.get(change.productId);
+            if (permanentId) {
+              // Actualizar el ID en el cambio
+              change.productId = permanentId;
+              if (change.data && change.data.producto) {
+                change.data.producto = permanentId;
+              }
+
+              // Procesar el cambio con el ID permanente
+              await this.processChange(change);
+              await IndexedDB.removePendingChange(change.id);
+
+              // Si es un DELETE, notificar a la UI
+              if (change.type === "DELETE_CATALOG") {
+                window.dispatchEvent(
+                  new CustomEvent("localCatalogUpdate", {
+                    detail: {
+                      type: "delete",
+                      productId: permanentId,
+                    },
+                  })
+                );
+              }
+            } else {
+              // Si no encontramos un ID permanente, probablemente el producto ya no existe
+              await IndexedDB.removePendingChange(change.id);
+              OfflineDebugger.log("SKIPPING_CHANGE", {
+                reason: "No permanent ID found",
+                change,
+              });
+            }
+          } else {
+            // Procesar cambios con IDs permanentes normalmente
+            await this.processChange(change);
+            await IndexedDB.removePendingChange(change.id);
+          }
         } catch (error) {
           OfflineDebugger.error("SYNC_CHANGE_ERROR", { change, error });
         }
@@ -301,6 +372,11 @@ class OfflineManager {
         case "DELETE":
           return await api.http.deleteProductStatus(change.productId);
         case "CREATE_CATALOG":
+          OfflineDebugger.log("PROCESSING_CREATE_CATALOG", { 
+            change, 
+            productId: change.productId, 
+            tempId: change.tempId 
+          });
           result = await api.http.createCatalogProduct(change.data);
           return result;
         case "UPDATE_CATALOG":
@@ -386,9 +462,20 @@ class OfflineManager {
       await IndexedDB.addPendingChange({
         type: "CREATE_CATALOG",
         tempId: tempId,
+        productId: tempId, // Adding productId to match what the sync process expects
         data: productData,
         timestamp: new Date().toISOString(),
       });
+
+      // Emitir un evento local para actualizar la UI
+      window.dispatchEvent(
+        new CustomEvent("localCatalogUpdate", {
+          detail: {
+            type: "create",
+            product: productToSave,
+          },
+        })
+      );
 
       return productToSave;
     } catch (error) {
@@ -428,6 +515,16 @@ class OfflineManager {
         timestamp: new Date().toISOString(),
       });
 
+      // Emitir un evento local para actualizar la UI
+      window.dispatchEvent(
+        new CustomEvent("localCatalogUpdate", {
+          detail: {
+            type: "update",
+            product: updatedProduct,
+          },
+        })
+      );
+
       return updatedProduct;
     } catch (error) {
       OfflineDebugger.error("UPDATE_CATALOG_PRODUCT_ERROR", error, {
@@ -448,12 +545,25 @@ class OfflineManager {
         return result;
       }
 
+      // Primero eliminar el producto de IndexedDB
       await IndexedDB.deleteCatalogProduct(productId);
+
+      // Añadir el cambio pendiente
       await IndexedDB.addPendingChange({
         type: "DELETE_CATALOG",
         productId,
         timestamp: new Date().toISOString(),
       });
+
+      // Emitir un evento local para actualizar la UI
+      window.dispatchEvent(
+        new CustomEvent("localCatalogUpdate", {
+          detail: {
+            type: "delete",
+            productId,
+          },
+        })
+      );
 
       return { success: true };
     } catch (error) {

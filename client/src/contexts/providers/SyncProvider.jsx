@@ -20,6 +20,13 @@ export const SyncProvider = ({ children }) => {
           changes.forEach((change) => {
             console.log(`Tipo: ${change.type}`);
             console.log(`ID Producto: ${change.productId}`);
+            
+            // Más detalles para cambios de CREATE_CATALOG
+            if (change.type === "CREATE_CATALOG") {
+              console.log(`Temp ID: ${change.tempId}`);
+              console.log(`Nombre Producto: ${change.data?.nombre || 'N/A'}`);
+            }
+            
             console.log(`Datos:`, change.data);
             console.log(
               `Timestamp: ${new Date(change.timestamp).toLocaleString()}`
