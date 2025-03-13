@@ -156,21 +156,41 @@ const CatalogManagement = ({ isOpen, onClose }) => {
     </div>
   );
 
-  // Efecto para manejar eventos de WebSocket
+  // Escuchar eventos de socket y locales
   useEffect(() => {
-    if (!socket) return;
-
-    const handleCatalogUpdate = async (data) => {
-      console.log("Recibida actualización de catálogo:", data);
-      await loadProducts(); // Recargar todos los productos en lugar de manipular el estado directamente
+    const handleCatalogUpdate = (data) => {
+      if (data.type === "create") {
+        setProducts((prevProducts) => [...prevProducts, data.product]);
+      } else if (data.type === "delete") {
+        setProducts((prevProducts) =>
+          prevProducts.filter((p) => p._id !== data.productId)
+        );
+      } else if (data.type === "update") {
+        setProducts((prevProducts) =>
+          prevProducts.map((p) =>
+            p._id === data.product._id ? data.product : p
+          )
+        );
+      }
     };
 
-    socket.on("catalogUpdate", handleCatalogUpdate);
+    if (socket) {
+      socket.on("catalogUpdate", handleCatalogUpdate);
+    }
+
+    // Escuchar eventos locales para modo offline
+    const handleLocalCatalogUpdate = (event) => {
+      handleCatalogUpdate(event.detail);
+    };
+    window.addEventListener("localCatalogUpdate", handleLocalCatalogUpdate);
 
     return () => {
-      socket.off("catalogUpdate", handleCatalogUpdate);
+      if (socket) {
+        socket.off("catalogUpdate", handleCatalogUpdate);
+      }
+      window.removeEventListener("localCatalogUpdate", handleLocalCatalogUpdate);
     };
-  }, [socket, loadProducts]);
+  }, [socket]);
 
   if (!isOpen) return null;
 

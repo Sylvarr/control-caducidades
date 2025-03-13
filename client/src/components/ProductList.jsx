@@ -83,8 +83,10 @@ const ProductList = () => {
     handleCloseExpiringModal,
   } = useModalManagement();
 
-  const { calculateExpiringProducts, getGroupedExpiringProducts } =
-    useExpiringProducts(products);
+  const {
+    calculateExpiringProducts,
+    getGroupedExpiringProducts,
+  } = useExpiringProducts(products);
 
   // Prevenir scroll cuando los modales están abiertos
   usePreventScroll(isUpdateModalOpen && !isClosingUpdateModal);
@@ -331,12 +333,18 @@ const ProductList = () => {
       }
     };
 
+    const handleLocalCatalogUpdate = (event) => {
+      handleCatalogUpdate(event.detail);
+    };
+    window.addEventListener("localCatalogUpdate", handleLocalCatalogUpdate);
+
     socket.on("productStatusUpdate", handleProductStatusUpdate);
     socket.on("catalogUpdate", handleCatalogUpdate);
 
     return () => {
       socket.off("productStatusUpdate", handleProductStatusUpdate);
       socket.off("catalogUpdate", handleCatalogUpdate);
+      window.removeEventListener("localCatalogUpdate", handleLocalCatalogUpdate);
     };
   }, [socket, updateProductInState, removeProductFromState, addProductToState]);
 

@@ -21,9 +21,23 @@ class IndexedDBService {
     this.initPromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => {
+      request.onerror = async () => {
         OfflineDebugger.error("INDEXEDDB_ERROR", request.error);
-        reject(request.error);
+        
+        // Si el error es de versión, intentar eliminar la base de datos y reiniciar
+        if (request.error.name === "VersionError") {
+          try {
+            await this.deleteDatabase();
+            // Reintentar la inicialización
+            this.initPromise = null;
+            await this.init();
+            resolve();
+          } catch (error) {
+            reject(error);
+          }
+        } else {
+          reject(request.error);
+        }
       };
 
       request.onsuccess = () => {
@@ -50,18 +64,17 @@ class IndexedDBService {
             keyPath: "id",
             autoIncrement: true,
           });
-          pendingStore.createIndex("timestamp", "timestamp");
           pendingStore.createIndex("type", "type");
           pendingStore.createIndex("productId", "productId");
+          pendingStore.createIndex("timestamp", "timestamp");
         }
 
-        // Store para el catálogo de productos
+        // Store para catálogo de productos
         if (!db.objectStoreNames.contains(STORES.CATALOG)) {
           const catalogStore = db.createObjectStore(STORES.CATALOG, {
             keyPath: "_id",
           });
           catalogStore.createIndex("nombre", "nombre");
-          catalogStore.createIndex("tipo", "tipo");
           catalogStore.createIndex("updatedAt", "updatedAt");
         }
       };
@@ -248,6 +261,29 @@ class IndexedDBService {
       request.onerror = () => {
         OfflineDebugger.error("CLEAR_PRODUCT_STATUS_ERROR", request.error);
         reject(request.error);
+      };
+    });
+  }
+
+  // Método para eliminar la base de datos
+  async deleteDatabase() {
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+    
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(DB_NAME);
+      
+      request.onerror = () => {
+        OfflineDebugger.error("DELETE_DB_ERROR", request.error);
+        reject(request.error);
+      };
+      
+      request.onsuccess = () => {
+        OfflineDebugger.log("DATABASE_DELETED", { database: DB_NAME });
+        this.initPromise = null; // Reset init promise
+        resolve();
       };
     });
   }

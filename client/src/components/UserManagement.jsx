@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users, UserPlus, Trash2, Eye, EyeOff, RefreshCw } from "lucide-react";
+import { Users, UserPlus, Trash2, Eye, EyeOff, RefreshCw, WifiOff } from "lucide-react";
 import PropTypes from "prop-types";
 import config from "../config";
 import usePreventScroll from "../hooks/usePreventScroll";
 import ModalContainer from "./ModalContainer";
 import { useSocket } from "../hooks/useSocket";
+import OfflineManager from "../services/offlineManager";
 
 const UserManagement = ({
   isOpen = false,
@@ -28,6 +29,44 @@ const UserManagement = ({
   const [showPassword, setShowPassword] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+
+  // Verificar estado offline al abrir el modal
+  useEffect(() => {
+    if (isOpen) {
+      const checkOfflineStatus = () => {
+        const offlineStatus = !navigator.onLine || OfflineManager.isOfflineMode;
+        setIsOffline(offlineStatus);
+        return offlineStatus;
+      };
+      
+      // Verificar estado inicial
+      const initialOfflineStatus = checkOfflineStatus();
+      
+      // Si estamos online, cargar usuarios
+      if (!initialOfflineStatus) {
+        loadUsers();
+      }
+      
+      // Configurar listeners para cambios en la conectividad
+      const handleOnline = () => {
+        setIsOffline(false);
+        loadUsers();
+      };
+      
+      const handleOffline = () => {
+        setIsOffline(true);
+      };
+      
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
+    }
+  }, [isOpen]);
 
   // Cargar usuarios
   const loadUsers = useCallback(async () => {
@@ -51,12 +90,6 @@ const UserManagement = ({
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      loadUsers();
-    }
-  }, [isOpen, loadUsers]);
 
   // Escuchar eventos de socket para actualizaciones de usuarios
   useEffect(() => {
@@ -245,6 +278,21 @@ const UserManagement = ({
     >
       {/* Content */}
       <div className="p-4 max-h-[calc(100vh-12rem)] overflow-y-auto">
+        {/* Mensaje de alerta para modo offline */}
+        {isOffline && (
+          <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-md
+            animate-[slideDown_0.3s_ease-out] text-amber-800 flex items-start gap-3">
+            <WifiOff className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-medium mb-1">Servicio no disponible</h3>
+              <p className="text-sm">
+                La gestión de usuarios no está disponible en modo offline por razones de seguridad.
+                Por favor, conéctate a internet para administrar usuarios.
+              </p>
+            </div>
+          </div>
+        )}
+        
         {error && (
           <div
             className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm
@@ -254,8 +302,8 @@ const UserManagement = ({
           </div>
         )}
 
-        {/* Botón de crear usuario */}
-        {!showCreateForm && (
+        {/* Botón de crear usuario (oculto en modo offline) */}
+        {!showCreateForm && !isOffline && (
           <button
             onClick={() => setShowCreateForm(true)}
             className="w-full p-3 mb-4 flex items-center justify-center gap-2
@@ -267,8 +315,8 @@ const UserManagement = ({
           </button>
         )}
 
-        {/* Formulario de creación */}
-        {showCreateForm && (
+        {/* Formulario de creación (oculto en modo offline) */}
+        {showCreateForm && !isOffline && (
           <form
             onSubmit={handleCreateUser}
             className="mb-6 p-4 bg-gray-50 rounded-lg
@@ -414,7 +462,7 @@ const UserManagement = ({
 
         {/* Lista de usuarios */}
         <div className="space-y-3">
-          {loading ? (
+          {loading && !isOffline ? (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="w-6 h-6 text-[#1d5030] animate-spin" />
             </div>
@@ -435,7 +483,8 @@ const UserManagement = ({
                   </p>
                 </div>
 
-                {currentUser?._id !== user._id && (
+                {/* Botón de eliminar (oculto en modo offline) */}
+                {currentUser?._id !== user._id && !isOffline && (
                   <button
                     onClick={() => setDeleteConfirm(user._id)}
                     className="p-2 text-red-500 hover:bg-red-50
@@ -446,7 +495,7 @@ const UserManagement = ({
                 )}
 
                 {/* Confirmación de eliminación */}
-                {deleteConfirm === user._id && (
+                {deleteConfirm === user._id && !isOffline && (
                   <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4
                       bg-black/50 animate-[fadeIn_0.2s_ease-out]"
@@ -486,6 +535,13 @@ const UserManagement = ({
                 )}
               </div>
             ))
+          )}
+          
+          {/* Mensaje si no hay usuarios para mostrar */}
+          {!loading && users.length === 0 && !isOffline && (
+            <div className="text-center py-8 text-gray-500">
+              No hay usuarios para mostrar
+            </div>
           )}
         </div>
       </div>

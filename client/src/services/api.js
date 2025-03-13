@@ -165,12 +165,15 @@ const httpOperations = {
   },
 };
 
+// Métodos para el catálogo
+export const getAllCatalogProducts = async () => {
+  return await OfflineManager.getAllCatalogProducts();
+};
+
 // Exportar las operaciones envueltas con el OfflineManager
 export const getAllProductStatus = () => OfflineManager.getAllProductStatus();
 export const updateProductStatus = (productId, data) =>
   OfflineManager.updateProductStatus(productId, data);
-export const getAllCatalogProducts = () =>
-  OfflineManager.getAllCatalogProducts();
 export const deleteProductStatus = (productId) =>
   OfflineManager.deleteProductStatus(productId);
 export const deleteProduct = (productId) =>
