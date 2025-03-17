@@ -44,6 +44,11 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
     [formData, validateForm]
   );
 
+  // Manejar cambio de tipo de producto con botones
+  const handleTypeChange = useCallback((tipo) => {
+    setFormData((prev) => ({ ...prev, tipo }));
+  }, []);
+
   // Crear producto
   const handleCreateProduct = async (e) => {
     e.preventDefault();
@@ -56,8 +61,8 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
 
     try {
       setIsSubmitting(true);
-      await OfflineManager.createCatalogProduct(formData);
-      await onProductCreated();
+      const newProduct = await OfflineManager.createCatalogProduct(formData);
+      onProductCreated(newProduct);
       handleClose();
     } catch (err) {
       setError(err.message);
@@ -100,9 +105,9 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
           </div>
           <button
             onClick={handleClose}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            className="p-2 min-w-[48px] min-h-[48px] flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-6 h-6 text-gray-500" />
           </button>
         </div>
 
@@ -140,25 +145,39 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Tipo
               </label>
-              <select
-                name="tipo"
-                value={formData.tipo}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md
-                  focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50"
-              >
-                <option value="permanente">Permanente</option>
-                <option value="promocional">Promocional</option>
-              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleTypeChange("permanente")}
+                  className={`px-4 py-3 min-h-[48px] text-sm font-medium rounded-md transition-colors
+                    ${formData.tipo === "permanente" 
+                      ? "bg-[#1d5030]/10 text-[#1d5030] border-2 border-[#1d5030]" 
+                      : "bg-gray-50 text-gray-700 border border-gray-300 hover:bg-gray-100"
+                    }`}
+                >
+                  Permanente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTypeChange("promocional")}
+                  className={`px-4 py-3 min-h-[48px] text-sm font-medium rounded-md transition-colors
+                    ${formData.tipo === "promocional" 
+                      ? "bg-[#c17817]/10 text-[#c17817] border-2 border-[#c17817]" 
+                      : "bg-gray-50 text-gray-700 border border-gray-300 hover:bg-gray-100"
+                    }`}
+                >
+                  Promocional
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button
                 type="button"
                 onClick={handleClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700
+                className="px-4 py-3 min-h-[48px] min-w-[80px] text-sm font-medium text-gray-700
                   bg-gray-50 hover:bg-gray-100
-                  rounded-md transition-colors"
+                  rounded-md transition-colors flex items-center justify-center"
               >
                 Cancelar
               </button>
@@ -169,15 +188,15 @@ const CreateProductModal = ({ isOpen, onClose, onProductCreated }) => {
                   !formData.nombre ||
                   Object.values(formErrors).some(Boolean)
                 }
-                className="px-4 py-2 text-sm font-medium text-white
+                className="px-4 py-3 min-h-[48px] min-w-[100px] text-sm font-medium text-white
                   bg-[#1d5030] hover:bg-[#1d5030]/90
                   rounded-md transition-colors
                   disabled:opacity-50 disabled:cursor-not-allowed
-                  flex items-center gap-2"
+                  flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <RefreshCw className="w-5 h-5 animate-spin" />
                     Creando...
                   </>
                 ) : (
