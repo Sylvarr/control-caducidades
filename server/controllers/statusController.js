@@ -40,6 +40,7 @@ exports.updateStatus = async (req, res) => {
       fechaAlmacen,
       fechasAlmacen = [],
       cajaUnica,
+      hayUnicaCajaActual,
     } = req.body;
 
     console.log("Fecha Frente recibida:", fechaFrente);
@@ -50,6 +51,7 @@ exports.updateStatus = async (req, res) => {
       fechaAlmacen,
       fechasAlmacen,
       cajaUnica: Boolean(cajaUnica),
+      hayUnicaCajaActual: Boolean(hayUnicaCajaActual),
     };
 
     console.log("Datos de actualización preparados:", updateData);

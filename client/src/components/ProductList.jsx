@@ -41,6 +41,7 @@ const ProductList = () => {
     fechaAlmacen2: "",
     fechaAlmacen3: "",
     cajaUnica: false,
+    hayUnicaCajaActual: false,
     showSecondDate: false,
     showThirdDate: false,
     noHayEnAlmacen: false,
@@ -155,6 +156,7 @@ const ProductList = () => {
           ? new Date(terceraFecha).toISOString().split("T")[0]
           : "",
         cajaUnica: product.cajaUnica || false,
+        hayUnicaCajaActual: product.hayUnicaCajaActual || false,
         showSecondDate: Boolean(segundaFecha),
         showThirdDate: Boolean(terceraFecha),
         noHayEnAlmacen: product.estado === "frente-agota",
@@ -200,6 +202,7 @@ const ProductList = () => {
           : updateForm.fechaAlmacen || null,
         fechasAlmacen: updateForm.noHayEnAlmacen ? [] : fechasAlmacen,
         cajaUnica: Boolean(updateForm.cajaUnica),
+        hayUnicaCajaActual: Boolean(updateForm.hayUnicaCajaActual),
         estado: updateForm.noHayEnAlmacen ? "frente-agota" : "frente-cambia",
       };
 

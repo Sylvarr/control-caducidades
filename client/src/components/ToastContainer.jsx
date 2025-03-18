@@ -1,4 +1,4 @@
-import { X, Undo2 } from "lucide-react";
+import { X, Undo2, CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 
@@ -6,27 +6,36 @@ const getToastStyles = (type) => {
   switch (type) {
     case "success":
       return {
-        container: "bg-[#1d5030] text-white",
-        icon: "text-white",
-        button: "bg-white text-[#1d5030] hover:bg-white/90",
+        container: "bg-white border-l-4 border-[#1d5030] text-gray-800",
+        icon: "text-[#1d5030]",
+        button: "bg-[#1d5030]/10 text-[#1d5030] hover:bg-[#1d5030]/20",
+        shadowColor: "rgba(29, 80, 48, 0.2)",
+        Icon: CheckCircle,
       };
     case "error":
       return {
-        container: "bg-red-600 text-white",
-        icon: "text-white",
-        button: "bg-white text-red-600 hover:bg-white/90",
+        container: "bg-white border-l-4 border-red-600 text-gray-800",
+        icon: "text-red-600",
+        button: "bg-red-600/10 text-red-600 hover:bg-red-600/20",
+        shadowColor: "rgba(220, 38, 38, 0.2)",
+        Icon: AlertCircle,
       };
     case "warning":
       return {
-        container: "bg-amber-500 text-white",
-        icon: "text-white",
-        button: "bg-white text-amber-600 hover:bg-white/90",
+        container: "bg-white border-l-4 border-amber-500 text-gray-800",
+        icon: "text-amber-600",
+        button: "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20",
+        shadowColor: "rgba(245, 158, 11, 0.2)",
+        Icon: AlertTriangle,
       };
+    case "info":
     default:
       return {
-        container: "bg-[#1d5030] text-white",
-        icon: "text-white",
-        button: "bg-white text-[#1d5030] hover:bg-white/90",
+        container: "bg-white border-l-4 border-blue-500 text-gray-800",
+        icon: "text-blue-600",
+        button: "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20",
+        shadowColor: "rgba(59, 130, 246, 0.2)",
+        Icon: Info,
       };
   }
 };
@@ -34,6 +43,7 @@ const getToastStyles = (type) => {
 const Toast = ({ toast, onRemove, onUndo }) => {
   const [isExiting, setIsExiting] = useState(false);
   const styles = getToastStyles(toast.type);
+  const { Icon } = styles;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -41,7 +51,7 @@ const Toast = ({ toast, onRemove, onUndo }) => {
       setTimeout(() => {
         onRemove(toast.id);
       }, 150); // Duración de la animación de salida
-    }, 3000); // Duración del toast
+    }, 5000); // Duración del toast aumentada a 5 segundos
 
     return () => clearTimeout(timer);
   }, [toast.id, onRemove]);
@@ -56,21 +66,45 @@ const Toast = ({ toast, onRemove, onUndo }) => {
   const showUndo = toast.message.endsWith("desclasificado correctamente.");
 
   const handleUndo = async () => {
-    console.log("Toast data:", {
+    // Verificar que el ID del producto está disponible
+    if (!toast.productId) {
+      console.error("Error: Toast no contiene ID de producto para deshacer", toast);
+      return;
+    }
+
+    console.log("Intentando deshacer con datos:", {
       message: toast.message,
       productId: toast.productId,
       hasUndoFunction: !!onUndo,
     });
 
-    if (onUndo && toast.productId) {
+    if (onUndo) {
       try {
-        await onUndo(toast.productId);
-        handleManualClose();
+        // Desactivar el botón temporalmente para evitar clics múltiples
+        const buttonElement = document.querySelector(`button[data-toast-id="${toast.id}"]`);
+        if (buttonElement) buttonElement.disabled = true;
+        
+        // Realizar la operación de deshacer
+        const success = await onUndo(toast.productId);
+        
+        if (success) {
+          handleManualClose();
+        } else {
+          // Si falla, permitir intentar de nuevo
+          if (buttonElement) buttonElement.disabled = false;
+          console.error("La operación de restauración no tuvo éxito");
+        }
       } catch (error) {
         console.error("Error en handleUndo:", error);
+        // Si hay una excepción, también permitir intentar de nuevo
+        const buttonElement = document.querySelector(`button[data-toast-id="${toast.id}"]`);
+        if (buttonElement) buttonElement.disabled = false;
       }
     } else {
-      console.warn("No se puede deshacer: falta productId o función onUndo");
+      console.warn("No se puede deshacer: falta función onUndo", {
+        productId: toast.productId,
+        hasUndoFunction: !!onUndo
+      });
     }
   };
 
@@ -78,25 +112,32 @@ const Toast = ({ toast, onRemove, onUndo }) => {
     <div
       className={`
         ${styles.container}
-        px-4 py-3 rounded-lg shadow-lg
+        px-4 py-3.5 rounded-lg 
+        shadow-[0_4px_12px_${styles.shadowColor}]
         flex items-center justify-between
-        w-[calc(100vw-32px)] sm:w-auto sm:min-w-[300px] sm:max-w-md
+        w-[calc(100vw-32px)] sm:w-auto sm:min-w-[320px] sm:max-w-md
         ${isExiting ? "animate-slide-out" : "animate-slide-in"}
-        font-['Noto Sans'] text-sm font-medium
+        font-['Noto Sans'] text-sm
         transform transition-all duration-200
+        border bg-gray-50/80
       `}
     >
-      <span className="mr-2">{toast.message}</span>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 flex-1">
+        <Icon className={`${styles.icon} w-5 h-5 flex-shrink-0`} />
+        <span className="font-medium text-gray-700 tracking-wide leading-snug">{toast.message}</span>
+      </div>
+      <div className="flex items-center gap-2 ml-3">
         {showUndo && (
           <button
             onClick={handleUndo}
+            data-toast-id={toast.id}
             className={`
               ${styles.button}
               px-3 py-1.5 rounded-md
               transition-colors duration-200
               flex items-center gap-1.5
-              text-sm font-medium
+              text-sm font-medium tracking-wide
+              whitespace-nowrap
             `}
           >
             <Undo2 className="w-4 h-4" />
@@ -108,9 +149,10 @@ const Toast = ({ toast, onRemove, onUndo }) => {
           className={`
             ${styles.icon}
             p-1.5 rounded-full
-            hover:bg-white/10
+            hover:bg-gray-100
             transition-colors duration-200
           `}
+          aria-label="Cerrar notificación"
         >
           <X size={16} />
         </button>

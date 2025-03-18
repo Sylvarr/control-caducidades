@@ -268,6 +268,7 @@ const UpdateModal = ({
         showSecondDate: true,
         fechaAlmacen2: "",
         cajaUnica: false,
+        hayUnicaCajaActual: false,
       }));
       setDateErrors((prev) => ({
         ...prev,
@@ -287,6 +288,7 @@ const UpdateModal = ({
         showThirdDate: true,
         fechaAlmacen3: "",
         cajaUnica: false,
+        hayUnicaCajaActual: false,
       }));
       setDateErrors((prev) => ({
         ...prev,
@@ -326,6 +328,7 @@ const UpdateModal = ({
       showSecondDate: false,
       showThirdDate: false,
       cajaUnica: checked ? false : updateForm.cajaUnica,
+      hayUnicaCajaActual: checked ? false : updateForm.hayUnicaCajaActual,
     });
   };
 
@@ -339,6 +342,7 @@ const UpdateModal = ({
       showSecondDate: false,
       showThirdDate: false,
       cajaUnica: false,
+      hayUnicaCajaActual: false,
     });
     setShowConfirmDialog(false);
   };
@@ -513,6 +517,21 @@ const UpdateModal = ({
                     }
                     tooltip="Si se selecciona esta opción, se considerará que solo queda una caja del producto en almacén."
                   />
+                  
+                  {updateForm.showSecondDate && !updateForm.noHayEnAlmacen && (
+                    <CustomCheckbox
+                      id="hayUnicaCajaActual"
+                      label="Solo una caja de la fecha principal"
+                      checked={updateForm.hayUnicaCajaActual}
+                      onChange={(checked) =>
+                        setUpdateForm({
+                          ...updateForm,
+                          hayUnicaCajaActual: checked,
+                        })
+                      }
+                      tooltip="Si se selecciona esta opción, se considerará que solo hay una caja de la fecha principal antes de cambiar a otra fecha."
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -630,6 +649,7 @@ UpdateModal.propTypes = {
     cajaUnica: PropTypes.bool,
     showSecondDate: PropTypes.bool,
     showThirdDate: PropTypes.bool,
+    hayUnicaCajaActual: PropTypes.bool,
   }).isRequired,
   setUpdateForm: PropTypes.func.isRequired,
   isUpdating: PropTypes.bool.isRequired,

@@ -1,4 +1,99 @@
-import { useState, useCallback } from "react";
+// Crear un almacenamiento global para el historial de productos eliminados
+// Esto garantiza que esté disponible incluso si los estados de React se reinician
+if (typeof window !== 'undefined') {
+  window.deletedProductsHistory = window.deletedProductsHistory || {
+    // Usar un objeto para almacenar por ID del producto
+    history: {},
+    
+    // Añadir un producto al historial
+    addProduct: function(product) {
+      if (!product || !product.producto || !product.producto._id) {
+        console.error('Intento de añadir un producto inválido al historial');
+        return;
+      }
+      
+      const productId = product.producto._id;
+      console.log('Añadiendo producto al historial:', productId, product.producto.nombre);
+      
+      // Guardar en el historial en memoria
+      this.history[productId] = product;
+      
+      // También guardar en localStorage como respaldo
+      try {
+        // Leer el historial actual
+        let storedHistory = {};
+        const saved = localStorage.getItem('deletedProductsHistory');
+        if (saved) {
+          storedHistory = JSON.parse(saved);
+        }
+        
+        // Añadir/actualizar este producto
+        storedHistory[productId] = product;
+        
+        // Guardar de nuevo
+        localStorage.setItem('deletedProductsHistory', JSON.stringify(storedHistory));
+      } catch (e) {
+        console.error('Error al guardar el historial en localStorage:', e);
+      }
+    },
+    
+    // Obtener un producto del historial por ID
+    getProduct: function(productId) {
+      console.log('Buscando producto en el historial:', productId);
+      
+      // Primero buscar en la memoria
+      if (this.history[productId]) {
+        console.log('Producto encontrado en el historial en memoria');
+        return this.history[productId];
+      }
+      
+      // Si no está en memoria, intentar recuperar de localStorage
+      try {
+        const saved = localStorage.getItem('deletedProductsHistory');
+        if (saved) {
+          const storedHistory = JSON.parse(saved);
+          if (storedHistory[productId]) {
+            console.log('Producto encontrado en el historial en localStorage');
+            // Actualizar la versión en memoria
+            this.history[productId] = storedHistory[productId];
+            return storedHistory[productId];
+          }
+        }
+      } catch (e) {
+        console.error('Error al recuperar el historial de localStorage:', e);
+      }
+      
+      console.log('Producto no encontrado en el historial');
+      return null;
+    },
+    
+    // Eliminar un producto del historial
+    removeProduct: function(productId) {
+      console.log('Eliminando producto del historial:', productId);
+      
+      // Eliminar de la memoria
+      if (this.history[productId]) {
+        delete this.history[productId];
+      }
+      
+      // Eliminar de localStorage
+      try {
+        const saved = localStorage.getItem('deletedProductsHistory');
+        if (saved) {
+          const storedHistory = JSON.parse(saved);
+          if (storedHistory[productId]) {
+            delete storedHistory[productId];
+            localStorage.setItem('deletedProductsHistory', JSON.stringify(storedHistory));
+          }
+        }
+      } catch (e) {
+        console.error('Error al eliminar producto del historial en localStorage:', e);
+      }
+    }
+  };
+}
+
+import { useState, useCallback, useEffect } from "react";
 import { INITIAL_PRODUCTS_STATE } from "../constants/productConstants";
 import {
   getAllProductStatus,
@@ -12,7 +107,30 @@ export const useProductManagement = (addToast) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdatedProductId, setLastUpdatedProductId] = useState(null);
-  const [lastDeletedProduct, setLastDeletedProduct] = useState(null);
+  
+  // Cargar lastDeletedProduct desde localStorage si existe
+  const [lastDeletedProduct, setLastDeletedProduct] = useState(() => {
+    try {
+      const saved = localStorage.getItem('lastDeletedProduct');
+      return saved ? JSON.parse(saved) : null;
+    } catch (err) {
+      console.error('Error al cargar el último producto eliminado:', err);
+      return null;
+    }
+  });
+
+  // Persistir lastDeletedProduct en localStorage cuando cambie
+  useEffect(() => {
+    if (lastDeletedProduct) {
+      try {
+        localStorage.setItem('lastDeletedProduct', JSON.stringify(lastDeletedProduct));
+      } catch (err) {
+        console.error('Error al guardar el último producto eliminado:', err);
+      }
+    } else {
+      localStorage.removeItem('lastDeletedProduct');
+    }
+  }, [lastDeletedProduct]);
 
   const loadAllProducts = useCallback(async () => {
     try {
@@ -145,7 +263,14 @@ export const useProductManagement = (addToast) => {
       const unclassifiedProduct = {
         producto: productData,
         estado: "sin-clasificar",
+        fechaFrente: null,
+        fechaAlmacen: null,
+        fechasAlmacen: [],
+        cajaUnica: false,
+        hayUnicaCajaActual: false
       };
+      // Eliminar esta línea duplicada que causa un problema
+      // addProductToState(unclassifiedProduct);
 
       // Verificar si el producto ya existe en sin-clasificar
       // Primero verificar por ID exacto
@@ -208,10 +333,32 @@ export const useProductManagement = (addToast) => {
         throw new Error("Producto no encontrado");
       }
 
-      setLastDeletedProduct({
-        ...productToDelete,
-        producto: { ...productToDelete.producto },
-      });
+      // Hacer una copia profunda y completa del producto antes de eliminarlo
+      const savedProduct = {
+        producto: { 
+          _id: productToDelete.producto._id,
+          nombre: productToDelete.producto.nombre,
+          tipo: productToDelete.producto.tipo,
+          activo: productToDelete.producto.activo
+        },
+        estado: productToDelete.estado,
+        fechaFrente: productToDelete.fechaFrente,
+        fechaAlmacen: productToDelete.fechaAlmacen,
+        fechasAlmacen: productToDelete.fechasAlmacen ? [...productToDelete.fechasAlmacen] : [],
+        cajaUnica: Boolean(productToDelete.cajaUnica),
+        hayUnicaCajaActual: Boolean(productToDelete.hayUnicaCajaActual),
+        _id: productToDelete._id
+      };
+
+      console.log("Guardando producto eliminado:", savedProduct);
+      
+      // Guardar en el historial global
+      if (window.deletedProductsHistory) {
+        window.deletedProductsHistory.addProduct(savedProduct);
+      }
+      
+      // También mantener el último en el estado (para compatibilidad)
+      setLastDeletedProduct(savedProduct);
 
       await deleteProductStatus(productId);
       removeProductFromState(productId);
@@ -223,11 +370,13 @@ export const useProductManagement = (addToast) => {
         fechaAlmacen: null,
         fechasAlmacen: [],
         cajaUnica: false,
+        hayUnicaCajaActual: false
       };
       addProductToState(unclassifiedProduct);
 
+      // Asegurarse de que los datos del toast contengan el ID correcto del producto
       const toastData = {
-        productId: productToDelete.producto._id,
+        productId: productId, // Usar directamente el productId recibido como parámetro
       };
 
       addToast(
@@ -248,35 +397,60 @@ export const useProductManagement = (addToast) => {
 
   const handleUndoDelete = async (productId) => {
     try {
-      console.log("Intentando restaurar producto:", {
-        productId,
-        lastDeletedProduct,
-        hasLastDeleted: !!lastDeletedProduct,
-      });
+      console.log("Intentando restaurar producto con ID:", productId);
+      
+      // Intentar recuperar el producto del historial global primero
+      let productToRestore = null;
+      
+      if (window.deletedProductsHistory) {
+        productToRestore = window.deletedProductsHistory.getProduct(productId);
+      }
+      
+      // Si no está en el historial global, intentar del estado (para compatibilidad)
+      if (!productToRestore && lastDeletedProduct && lastDeletedProduct.producto._id === productId) {
+        productToRestore = lastDeletedProduct;
+        console.log("Usando producto del estado:", productToRestore);
+      }
 
-      if (!lastDeletedProduct) {
+      // Verificar si tenemos un producto para restaurar
+      if (!productToRestore) {
+        console.error("No se encontró producto para restaurar en el historial");
         throw new Error("No hay producto para restaurar");
       }
 
-      if (lastDeletedProduct.producto._id !== productId) {
-        throw new Error("El producto no coincide con el último eliminado");
-      }
+      console.log("Datos del producto a restaurar:", {
+        id: productToRestore.producto?._id,
+        nombre: productToRestore.producto?.nombre,
+        estado: productToRestore.estado
+      });
 
       const updateData = {
-        fechaFrente: lastDeletedProduct.fechaFrente,
-        fechaAlmacen: lastDeletedProduct.fechaAlmacen,
-        fechasAlmacen: lastDeletedProduct.fechasAlmacen || [],
-        cajaUnica: lastDeletedProduct.cajaUnica || false,
-        estado: lastDeletedProduct.estado,
+        fechaFrente: productToRestore.fechaFrente,
+        fechaAlmacen: productToRestore.fechaAlmacen,
+        fechasAlmacen: productToRestore.fechasAlmacen || [],
+        cajaUnica: productToRestore.cajaUnica || false,
+        hayUnicaCajaActual: productToRestore.hayUnicaCajaActual || false,
+        estado: productToRestore.estado,
       };
 
       console.log("Datos de restauración:", updateData);
 
-      await updateProductStatus(productId, updateData);
-      await loadAllProducts();
+      const result = await updateProductStatus(productId, updateData);
+      console.log("Resultado de la restauración:", result);
+      
+      await loadAllProducts(); // Recargar productos después de la restauración
 
-      const nombreProducto = lastDeletedProduct.producto.nombre;
-      setLastDeletedProduct(null);
+      const nombreProducto = productToRestore.producto.nombre;
+      
+      // Eliminar del historial ya que se ha restaurado
+      if (window.deletedProductsHistory) {
+        window.deletedProductsHistory.removeProduct(productId);
+      }
+      
+      // Limpiar el último eliminado si es el mismo (para compatibilidad)
+      if (lastDeletedProduct && lastDeletedProduct.producto._id === productId) {
+        setLastDeletedProduct(null);
+      }
 
       addToast(`${nombreProducto} restaurado correctamente.`, "success");
       return true;

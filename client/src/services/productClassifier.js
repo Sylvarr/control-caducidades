@@ -18,6 +18,7 @@ export function classifyProduct({
   fechaAlmacen,
   fechasAlmacen = [],
   cajaUnica = false,
+  hayUnicaCajaActual = false,
 }) {
   // Validar fechas requeridas
   if (!fechaFrente) {
@@ -42,7 +43,9 @@ export function classifyProduct({
   if (frontDate === storageDate) {
     if (cajaUnica) {
       return PRODUCT_STATES.ABIERTO_AGOTA;
-    } else if (fechasAlmacen && fechasAlmacen.length > 0) {
+    } else if (fechasAlmacen && fechasAlmacen.length > 0 && hayUnicaCajaActual) {
+      // Solo es "abierto-cambia" si hay solo una caja de la fecha actual 
+      // y hay otras fechas diferentes en almacén
       return PRODUCT_STATES.ABIERTO_CAMBIA;
     } else {
       return PRODUCT_STATES.SIN_CLASIFICAR;
@@ -90,6 +93,14 @@ export function validateProductData(data) {
     typeof data.cajaUnica !== "boolean"
   ) {
     errors.push("El campo cajaUnica debe ser un booleano");
+  }
+
+  // Validar hayUnicaCajaActual
+  if (
+    typeof data.hayUnicaCajaActual !== "undefined" &&
+    typeof data.hayUnicaCajaActual !== "boolean"
+  ) {
+    errors.push("El campo hayUnicaCajaActual debe ser un booleano");
   }
 
   return {

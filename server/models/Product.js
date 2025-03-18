@@ -23,6 +23,10 @@ const productStatusSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    hayUnicaCajaActual: {
+      type: Boolean,
+      default: false,
+    },
     estado: {
       type: String,
       enum: [
@@ -47,6 +51,7 @@ productStatusSchema.pre("save", function (next) {
     fechaAlmacen: this.fechaAlmacen,
     fechasAlmacen: this.fechasAlmacen,
     cajaUnica: this.cajaUnica,
+    hayUnicaCajaActual: this.hayUnicaCajaActual,
     estado: this.estado,
   });
 
@@ -74,8 +79,8 @@ productStatusSchema.pre("save", function (next) {
       if (this.cajaUnica) {
         console.log("Estableciendo estado: abierto-agota (última caja)");
         this.estado = "abierto-agota";
-      } else if (this.fechasAlmacen && this.fechasAlmacen.length > 0) {
-        console.log("Estableciendo estado: abierto-cambia (hay otras fechas)");
+      } else if (this.fechasAlmacen && this.fechasAlmacen.length > 0 && this.hayUnicaCajaActual) {
+        console.log("Estableciendo estado: abierto-cambia (hay otras fechas y solo una caja actual)");
         this.estado = "abierto-cambia";
       } else {
         console.log(
