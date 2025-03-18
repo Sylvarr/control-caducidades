@@ -19,6 +19,11 @@ router.get("/", verifyToken, catalogController.getAllProducts);
 
 // Rutas protegidas (solo supervisores)
 router.post("/", [verifyToken, isSupervisor], catalogController.addProduct);
+router.put(
+  "/:id",
+  [verifyToken, isSupervisor],
+  catalogController.updateProduct
+);
 router.delete(
   "/:id",
   [verifyToken, isSupervisor],

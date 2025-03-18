@@ -101,3 +101,47 @@ exports.toggleProductStatus = async (req, res) => {
     });
   }
 };
+
+// Actualizar un producto del catálogo
+exports.updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    // Asegurarse de que no se actualicen propiedades como _id, createdAt, etc.
+    const allowedUpdates = ['nombre', 'tipo', 'activo'];
+    const updates = {};
+    
+    for (const key of allowedUpdates) {
+      if (updateData[key] !== undefined) {
+        updates[key] = updateData[key];
+      }
+    }
+    
+    const updatedProduct = await CatalogProduct.findByIdAndUpdate(
+      id,
+      updates,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    // Emitir evento de actualización usando la instancia global
+    if (global.io) {
+      global.io.emit("catalogUpdate", {
+        type: "update",
+        product: updatedProduct,
+      });
+    }
+
+    res.json(updatedProduct);
+  } catch (error) {
+    console.error("Error al actualizar producto:", error);
+    res.status(400).json({
+      message: "Error al actualizar producto",
+      error: error.message,
+    });
+  }
+};

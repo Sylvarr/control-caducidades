@@ -312,8 +312,8 @@ const CustomDateInput = ({
         <button
           type="button"
           onClick={() => !disabled && setIsOpen(true)}
-          disabled={disabled}
           data-date-input={dataDateInput}
+          disabled={disabled}
           className={`
             flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg w-full
             font-medium text-sm transition-all duration-200

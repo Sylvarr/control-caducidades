@@ -11,6 +11,7 @@ router.get("/", catalogController.getAllProducts);
 
 // Rutas solo para supervisores
 router.post("/", isSupervisor, catalogController.addProduct);
+router.put("/:id", isSupervisor, catalogController.updateProduct);
 router.delete("/:id", isSupervisor, catalogController.deleteProduct);
 router.put("/:id/toggle", isSupervisor, catalogController.toggleProductStatus);
 

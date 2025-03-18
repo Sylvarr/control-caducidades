@@ -1,40 +1,77 @@
-import { RefreshCw, Plus, AlertCircle } from "lucide-react";
+import { RefreshCw, Plus, AlertCircle, Check, HelpCircle } from "lucide-react";
 import PropTypes from "prop-types";
 import { useState } from "react";
 import CustomDateInput from "./CustomDateInput";
 import ModalContainer from "./ModalContainer";
 
-const CustomCheckbox = ({ id, label, checked, disabled, onChange }) => (
-  <div className="flex items-center py-2.5 px-3 my-1.5 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors duration-200">
-    <input
-      type="checkbox"
-      id={id}
-      checked={checked}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.checked)}
-      className={`w-4.5 h-4.5 focus:ring-[#1d5030] border-gray-300 rounded
-        ${
-          disabled
-            ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-            : "text-[#1d5030]"
-        }`}
-    />
-    <label
-      htmlFor={id}
-      className={`pl-2.5 font-medium select-none text-sm
-        ${disabled ? "text-gray-400" : "text-[#2d3748]"}`}
-    >
-      {label}
-    </label>
-  </div>
+// Componente de checkbox mejorado con tooltip
+const CustomCheckbox = ({ id, label, checked, disabled, onChange, tooltip }) => (
+  <label
+    htmlFor={id}
+    className={`
+      flex items-center gap-3
+      w-full py-2.5 px-4 my-1.5 
+      rounded-lg transition-all duration-200
+      font-medium text-sm select-none
+      ${
+        disabled
+          ? "text-gray-400 cursor-not-allowed"
+          : "text-[#2d3748] hover:bg-gray-50 cursor-pointer"
+      }
+    `}
+  >
+    <div className="relative">
+      <input
+        type="checkbox"
+        id={id}
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="sr-only" // Oculto visualmente pero accesible
+      />
+      <div
+        className={`
+          w-5 h-5 rounded-md
+          flex items-center justify-center
+          transition-all duration-200
+          ${
+            disabled
+              ? "bg-gray-100"
+              : checked
+                ? "bg-[#1d5030]"
+                : "bg-white border-2 border-gray-300"
+          }
+        `}
+      >
+        {checked && <Check className="w-3.5 h-3.5 text-white" />}
+      </div>
+    </div>
+    <div className="flex items-center gap-1.5">
+      <span>{label}</span>
+      {tooltip && (
+        <div className="group relative">
+          <HelpCircle className="w-4 h-4 text-gray-400" />
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-48 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-10">
+            {tooltip}
+          </div>
+        </div>
+      )}
+    </div>
+  </label>
 );
 
 CustomCheckbox.propTypes = {
   id: PropTypes.string.isRequired,
   label: PropTypes.string.isRequired,
-  checked: PropTypes.bool,
+  checked: PropTypes.bool.isRequired,
   disabled: PropTypes.bool,
   onChange: PropTypes.func.isRequired,
+  tooltip: PropTypes.string,
+};
+
+CustomCheckbox.defaultProps = {
+  disabled: false,
+  tooltip: null,
 };
 
 const ConfirmDialog = ({ onConfirm, onCancel, title, message }) => (
@@ -84,14 +121,12 @@ const UpdateModal = ({
   onSubmit,
 }) => {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingNoHayEnAlmacen, setPendingNoHayEnAlmacen] = useState(false);
   const [dateErrors, setDateErrors] = useState({
     fechaAlmacen2: "",
     fechaAlmacen3: "",
   });
   const [showFrontDateDialog, setShowFrontDateDialog] = useState(false);
 
-  // Función para validar que una fecha sea posterior a otra
   const isDateAfter = (dateToCheck, baseDate) => {
     if (!dateToCheck || !baseDate) return true;
     const date1 = new Date(dateToCheck);
@@ -99,9 +134,7 @@ const UpdateModal = ({
     return date1 > date2;
   };
 
-  // Función para validar fechas adicionales
   const validateAdditionalDate = (value, dateNumber) => {
-    // Si no hay valor, solo limpiar el error y retornar true
     if (!value) {
       setDateErrors((prev) => ({ ...prev, [`fechaAlmacen${dateNumber}`]: "" }));
       return true;
@@ -110,7 +143,6 @@ const UpdateModal = ({
     const baseDate =
       dateNumber === 2 ? updateForm.fechaAlmacen : updateForm.fechaAlmacen2;
 
-    // Si no hay fecha base, no validar aún
     if (!baseDate) {
       return true;
     }
@@ -143,9 +175,7 @@ const UpdateModal = ({
     return isValid;
   };
 
-  // Función para manejar la eliminación de la fecha de frente
   const handleFrontDateRemoval = () => {
-    // Si no hay fecha de almacén, simplemente eliminar la fecha de frente
     if (!updateForm.fechaAlmacen) {
       setUpdateForm((prev) => ({
         ...prev,
@@ -154,16 +184,14 @@ const UpdateModal = ({
       return;
     }
 
-    // Verificar si la fecha de frente coincide con la primera fecha de almacén
     const frontDate = new Date(updateForm.fechaFrente).setHours(0, 0, 0, 0);
     const storageDate = new Date(updateForm.fechaAlmacen).setHours(0, 0, 0, 0);
 
     if (frontDate === storageDate) {
-      // Caso 1: Las fechas coinciden - Mantener la fecha de frente y mover las fechas de almacén
       const currentFrontDate = updateForm.fechaFrente;
       setUpdateForm({
         ...updateForm,
-        fechaFrente: currentFrontDate, // Mantener explícitamente la fecha de frente
+        fechaFrente: currentFrontDate,
         fechaAlmacen: updateForm.fechaAlmacen2 || "",
         fechaAlmacen2: updateForm.fechaAlmacen3 || "",
         fechaAlmacen3: "",
@@ -171,12 +199,10 @@ const UpdateModal = ({
         showSecondDate: Boolean(updateForm.fechaAlmacen3),
       });
     } else {
-      // Caso 2: Las fechas son diferentes - Mostrar diálogo
       setShowFrontDateDialog(true);
     }
   };
 
-  // Función para manejar cuando todo el producto pasa al frente
   const handleAllToFront = () => {
     setUpdateForm((prev) => ({
       ...prev,
@@ -190,7 +216,6 @@ const UpdateModal = ({
     setShowFrontDateDialog(false);
   };
 
-  // Función para manejar cuando solo parte del producto pasa al frente
   const handlePartialToFront = () => {
     setUpdateForm((prev) => ({
       ...prev,
@@ -199,26 +224,22 @@ const UpdateModal = ({
     setShowFrontDateDialog(false);
   };
 
-  // Función para manejar la eliminación de fechas de almacén
   const handleStorageDateRemoval = (dateNumber) => {
     setUpdateForm((prev) => {
       const newState = { ...prev };
 
       if (dateNumber === 1) {
-        // La primera fecha de almacén se elimina, las demás avanzan
         newState.fechaAlmacen = prev.fechaAlmacen2 || "";
         newState.fechaAlmacen2 = prev.fechaAlmacen3 || "";
         newState.fechaAlmacen3 = "";
         newState.showThirdDate = false;
         newState.showSecondDate = Boolean(prev.fechaAlmacen3);
       } else if (dateNumber === 2) {
-        // La segunda fecha se elimina, la tercera avanza
         newState.fechaAlmacen2 = prev.fechaAlmacen3 || "";
         newState.fechaAlmacen3 = "";
         newState.showThirdDate = false;
         newState.showSecondDate = Boolean(prev.fechaAlmacen3);
       } else if (dateNumber === 3) {
-        // La tercera fecha simplemente se elimina
         newState.fechaAlmacen3 = "";
         newState.showThirdDate = false;
       }
@@ -248,7 +269,6 @@ const UpdateModal = ({
         fechaAlmacen2: "",
         cajaUnica: false,
       }));
-      // Limpiar cualquier error previo al añadir una nueva fecha
       setDateErrors((prev) => ({
         ...prev,
         fechaAlmacen2: "",
@@ -268,7 +288,6 @@ const UpdateModal = ({
         fechaAlmacen3: "",
         cajaUnica: false,
       }));
-      // Limpiar cualquier error previo al añadir una nueva fecha
       setDateErrors((prev) => ({
         ...prev,
         fechaAlmacen3: "",
@@ -286,21 +305,18 @@ const UpdateModal = ({
 
   const canAddMoreDates =
     !updateForm.noHayEnAlmacen &&
-    updateForm.fechaAlmacen && // Solo permitir añadir si hay fecha principal
+    updateForm.fechaAlmacen &&
     (!updateForm.showSecondDate ||
       (updateForm.showSecondDate &&
         updateForm.fechaAlmacen2 &&
         !updateForm.showThirdDate));
 
   const handleNoHayEnAlmacenChange = (checked) => {
-    // Si hay fechas adicionales y se está marcando la casilla, mostrar confirmación
     if (checked && (updateForm.fechaAlmacen2 || updateForm.fechaAlmacen3)) {
       setShowConfirmDialog(true);
-      setPendingNoHayEnAlmacen(true);
       return;
     }
 
-    // Si no hay fechas adicionales o se está desmarcando, proceder normalmente
     setUpdateForm({
       ...updateForm,
       noHayEnAlmacen: checked,
@@ -325,12 +341,10 @@ const UpdateModal = ({
       cajaUnica: false,
     });
     setShowConfirmDialog(false);
-    setPendingNoHayEnAlmacen(false);
   };
 
   const handleCancelNoHayEnAlmacen = () => {
     setShowConfirmDialog(false);
-    setPendingNoHayEnAlmacen(false);
   };
 
   return (
@@ -345,6 +359,9 @@ const UpdateModal = ({
           <div className="flex-1 p-5 space-y-4">
             <div className="space-y-4">
               <div className="relative">
+                <h3 className="text-sm font-medium text-gray-500 mb-2">
+                  Fecha visible al cliente
+                </h3>
                 <CustomDateInput
                   label="Fecha Frente"
                   value={updateForm.fechaFrente}
@@ -352,6 +369,7 @@ const UpdateModal = ({
                     setUpdateForm({ ...updateForm, fechaFrente: value })
                   }
                   onRemove={handleFrontDateRemoval}
+                  className="w-full py-2.5 px-4 my-1.5 rounded-lg transition-all duration-200 font-medium text-sm select-none flex items-center justify-between shadow-sm hover:shadow-md"
                 />
               </div>
 
@@ -360,18 +378,23 @@ const UpdateModal = ({
                   <CustomCheckbox
                     id="noHayEnAlmacen"
                     label="No hay producto en almacén"
-                    checked={updateForm.noHayEnAlmacen || pendingNoHayEnAlmacen}
+                    checked={updateForm.noHayEnAlmacen}
+                    disabled={isUpdating}
                     onChange={handleNoHayEnAlmacenChange}
+                    tooltip="Si se selecciona esta opción, se eliminarán todas las fechas de almacén."
                   />
                 </div>
               </div>
 
               {!updateForm.noHayEnAlmacen && (
-                <div className="space-y-4">
+                <div className="space-y-5 mt-3">
                   <div className="relative">
+                    <h3 className="text-sm font-medium text-gray-500 mb-2">
+                      Fechas de caducidad en almacén
+                    </h3>
                     <div className="flex flex-col space-y-4">
                       <CustomDateInput
-                        label="Fecha Almacén"
+                        label="Fecha Principal"
                         value={updateForm.fechaAlmacen}
                         onChange={(value) =>
                           setUpdateForm({
@@ -386,12 +409,13 @@ const UpdateModal = ({
                           })
                         }
                         onRemove={() => handleStorageDateRemoval(1)}
+                        className="w-full py-2.5 px-4 my-1.5 rounded-lg transition-all duration-200 font-medium text-sm select-none flex items-center justify-between shadow-sm hover:shadow-md"
                       />
 
                       {updateForm.showSecondDate && (
                         <div className="relative">
                           <CustomDateInput
-                            label="Segunda Fecha"
+                            label="Fecha Secundaria"
                             value={updateForm.fechaAlmacen2}
                             onChange={(value) => {
                               if (validateAdditionalDate(value, 2)) {
@@ -408,11 +432,15 @@ const UpdateModal = ({
                             data-date-input="fechaAlmacen2"
                             onRemove={() => handleStorageDateRemoval(2)}
                             showRemoveWhenEmpty
+                            className="w-full py-2.5 px-4 my-1.5 rounded-lg transition-all duration-200 font-medium text-sm select-none flex items-center justify-between shadow-sm hover:shadow-md"
                           />
                           {dateErrors.fechaAlmacen2 && (
-                            <p className="mt-1 text-sm text-red-600">
-                              {dateErrors.fechaAlmacen2}
-                            </p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                              <p className="text-sm text-red-600 font-medium">
+                                {dateErrors.fechaAlmacen2}
+                              </p>
+                            </div>
                           )}
                         </div>
                       )}
@@ -420,7 +448,7 @@ const UpdateModal = ({
                       {updateForm.showThirdDate && (
                         <div className="relative">
                           <CustomDateInput
-                            label="Tercera Fecha"
+                            label="Fecha Adicional"
                             value={updateForm.fechaAlmacen3}
                             onChange={(value) => {
                               if (validateAdditionalDate(value, 3)) {
@@ -433,11 +461,15 @@ const UpdateModal = ({
                             data-date-input="fechaAlmacen3"
                             onRemove={() => handleStorageDateRemoval(3)}
                             showRemoveWhenEmpty
+                            className="w-full py-2.5 px-4 my-1.5 rounded-lg transition-all duration-200 font-medium text-sm select-none flex items-center justify-between shadow-sm hover:shadow-md"
                           />
                           {dateErrors.fechaAlmacen3 && (
-                            <p className="mt-1 text-sm text-red-600">
-                              {dateErrors.fechaAlmacen3}
-                            </p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                              <p className="text-sm text-red-600 font-medium">
+                                {dateErrors.fechaAlmacen3}
+                              </p>
+                            </div>
                           )}
                         </div>
                       )}
@@ -447,16 +479,24 @@ const UpdateModal = ({
                   {canAddMoreDates && (
                     <button
                       onClick={handleAddDate}
-                      className="w-full py-2 px-3 flex items-center justify-center gap-2
-                        text-sm font-medium text-[#1d5030] bg-[#1d5030]/10
-                        hover:bg-[#1d5030]/20 rounded-lg transition-colors duration-200
-                        disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full py-3 px-4 my-1.5 
+                        rounded-lg transition-all duration-300
+                        font-medium text-sm select-none
+                        flex items-center justify-center gap-2
+                        text-[#1d5030] bg-[#1d5030]/15
+                        hover:bg-[#1d5030]/25 hover:shadow-sm
+                        active:bg-[#1d5030]/30
+                        border border-dashed border-[#1d5030]/30
+                        disabled:opacity-40 disabled:cursor-not-allowed"
                       disabled={!updateForm.fechaAlmacen}
                     >
-                      <Plus className="w-4 h-4" />
+                      <Plus className="w-5 h-5" />
                       Añadir fecha adicional
                     </button>
                   )}
+
+                  {/* Separador visual */}
+                  <div className="border-t border-gray-100 my-3"></div>
 
                   <CustomCheckbox
                     id="cajaUnica"
@@ -471,6 +511,7 @@ const UpdateModal = ({
                         cajaUnica: checked,
                       })
                     }
+                    tooltip="Si se selecciona esta opción, se considerará que solo queda una caja del producto en almacén."
                   />
                 </div>
               )}
@@ -480,9 +521,11 @@ const UpdateModal = ({
           <div className="flex justify-end gap-3 p-5 pt-3 border-t border-gray-200">
             <button
               onClick={onClose}
-              className="min-h-[42px] px-5 text-sm font-medium text-[#2d3748]
-                bg-gray-50 hover:bg-gray-100
-                rounded-lg transition-colors duration-200"
+              className="min-h-[48px] px-5 text-sm font-medium 
+                text-[#1d5030] border border-[#1d5030]/30
+                bg-white hover:bg-[#1d5030]/5
+                rounded-md transition-colors duration-200
+                shadow-sm"
             >
               Cancelar
             </button>
@@ -492,15 +535,16 @@ const UpdateModal = ({
                 isUpdating ||
                 Object.values(dateErrors).some((error) => error !== "")
               }
-              className="min-h-[42px] px-5 text-sm font-medium text-white
+              className="min-h-[48px] px-5 text-sm font-medium text-white
                 bg-[#1d5030] hover:bg-[#1d5030]/90
-                rounded-lg transition-colors duration-200
+                rounded-md transition-colors duration-200
                 disabled:opacity-50 disabled:cursor-not-allowed
-                flex items-center gap-2"
+                flex items-center gap-2
+                shadow-sm"
             >
               {isUpdating ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-5 h-5 animate-spin" />
                   Actualizando...
                 </>
               ) : (
@@ -543,21 +587,21 @@ const UpdateModal = ({
               <button
                 onClick={handleAllToFront}
                 className="w-full px-4 py-2.5 text-sm font-medium text-white
-                  bg-[#1d5030] hover:bg-[#1d5030]/90 rounded-lg transition-colors"
+                  bg-[#1d5030] hover:bg-[#1d5030]/90 rounded-md transition-colors"
               >
                 Todo el producto pasa al frente
               </button>
               <button
                 onClick={handlePartialToFront}
                 className="w-full px-4 py-2.5 text-sm font-medium text-[#1d5030]
-                  bg-[#1d5030]/10 hover:bg-[#1d5030]/20 rounded-lg transition-colors"
+                  bg-[#1d5030]/10 hover:bg-[#1d5030]/20 rounded-md transition-colors"
               >
                 Solo una parte pasa al frente
               </button>
               <button
                 onClick={() => setShowFrontDateDialog(false)}
                 className="w-full px-4 py-2.5 text-sm font-medium text-gray-700
-                  bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
               >
                 Cancelar
               </button>
@@ -592,4 +636,5 @@ UpdateModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
 };
+
 export default UpdateModal;

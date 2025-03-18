@@ -25,22 +25,22 @@ function SearchBar({
               onSearchChange(value);
             }
           }}
-          className="w-full h-10 pl-9 pr-9 rounded-lg border-0 
+          className="w-full h-11 pl-10 pr-10 rounded-lg border-0 
             focus:outline-none focus:ring-2 focus:ring-[#1d5030]/50 focus:border-transparent
             font-['Noto Sans'] text-sm font-medium placeholder:text-gray-400
             bg-white shadow-sm"
           maxLength={15}
         />
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#1d5030] w-4 h-4" />
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#1d5030] w-5 h-5" />
         {searchTerm && (
           <button
             onClick={() => onSearchChange("")}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1
+            className="absolute right-3 top-1/2 -translate-y-1/2 p-1
               text-gray-400 hover:text-gray-600
               rounded-full hover:bg-gray-100
               transition-all duration-200"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         )}
       </div>
@@ -49,16 +49,16 @@ function SearchBar({
       <button
         onClick={onUnclassifiedClick}
         className={`
-          h-10 px-3 rounded-lg
+          h-11 px-4 rounded-lg
           font-['Noto Sans'] text-sm font-medium select-none
           transition-colors duration-200
           flex items-center gap-2
-          bg-white text-[#1d5030] hover:bg-gray-50
+          bg-white text-[#1d5030] hover:bg-[#1d5030]/10
           shadow-sm
         `}
       >
         Sin Clasificar
-        <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs select-none">
+        <span className="bg-[#f44336] text-white px-2.5 py-1 rounded-full text-xs font-bold select-none animate-pulse">
           {unclassifiedCount}
         </span>
       </button>

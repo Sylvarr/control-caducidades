@@ -35,13 +35,16 @@ export const useProductManagement = (addToast) => {
           estado: "sin-clasificar",
         }));
 
+      // Combinar y ordenar alfabéticamente los productos sin clasificar
+      const combinedUnclassifiedProducts = [
+        ...unclassifiedProducts,
+        ...statusData.filter(
+          (product) => product.estado === "sin-clasificar"
+        )
+      ].sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre));
+
       const organizedProducts = {
-        "sin-clasificar": [
-          ...unclassifiedProducts,
-          ...statusData.filter(
-            (product) => product.estado === "sin-clasificar"
-          ),
-        ],
+        "sin-clasificar": combinedUnclassifiedProducts,
         "frente-cambia": statusData.filter(
           (product) => product.estado === "frente-cambia"
         ),
@@ -77,7 +80,16 @@ export const useProductManagement = (addToast) => {
       );
 
       const category = productData.estado || "sin-clasificar";
+      
+      // Añadir el producto a su categoría
       newProducts[category] = [...newProducts[category], productData];
+      
+      // Ordenar alfabéticamente los productos sin clasificar
+      if (category === "sin-clasificar") {
+        newProducts[category] = newProducts[category].sort((a, b) => 
+          a.producto.nombre.localeCompare(b.producto.nombre)
+        );
+      }
 
       return newProducts;
     });
@@ -151,9 +163,13 @@ export const useProductManagement = (addToast) => {
       
       if (existsById || existsByName) return prevProducts;
 
+      // Añadir el producto y ordenar alfabéticamente
+      const newUnclassifiedProducts = [...prevProducts["sin-clasificar"], unclassifiedProduct]
+        .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre));
+
       return {
         ...prevProducts,
-        "sin-clasificar": [...prevProducts["sin-clasificar"], unclassifiedProduct],
+        "sin-clasificar": newUnclassifiedProducts,
       };
     });
   }, []);

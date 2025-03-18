@@ -6,27 +6,27 @@ const getToastStyles = (type) => {
   switch (type) {
     case "success":
       return {
-        container: "bg-white border-2 border-[#1d5030] text-[#1d5030]",
-        icon: "text-[#1d5030]",
-        button: "bg-[#1d5030] text-white hover:bg-[#1d5030]/90",
+        container: "bg-[#1d5030] text-white",
+        icon: "text-white",
+        button: "bg-white text-[#1d5030] hover:bg-white/90",
       };
     case "error":
       return {
-        container: "bg-white border-2 border-red-600 text-red-600",
-        icon: "text-red-600",
-        button: "bg-red-600 text-white hover:bg-red-700",
+        container: "bg-red-600 text-white",
+        icon: "text-white",
+        button: "bg-white text-red-600 hover:bg-white/90",
       };
     case "warning":
       return {
-        container: "bg-white border-2 border-[#1d5030] text-[#1d5030]",
-        icon: "text-[#1d5030]",
-        button: "bg-[#1d5030] text-white hover:bg-[#1d5030]/90",
+        container: "bg-amber-500 text-white",
+        icon: "text-white",
+        button: "bg-white text-amber-600 hover:bg-white/90",
       };
     default:
       return {
-        container: "bg-white border-2 border-[#1d5030] text-[#1d5030]",
-        icon: "text-[#1d5030]",
-        button: "bg-[#1d5030] text-white hover:bg-[#1d5030]/90",
+        container: "bg-[#1d5030] text-white",
+        icon: "text-white",
+        button: "bg-white text-[#1d5030] hover:bg-white/90",
       };
   }
 };
@@ -108,7 +108,7 @@ const Toast = ({ toast, onRemove, onUndo }) => {
           className={`
             ${styles.icon}
             p-1.5 rounded-full
-            hover:bg-gray-100
+            hover:bg-white/10
             transition-colors duration-200
           `}
         >
@@ -132,7 +132,7 @@ Toast.propTypes = {
 
 const ToastContainer = ({ toasts, removeToast, onUndo }) => {
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="fixed bottom-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
       <div className="flex flex-col gap-2 items-end pointer-events-auto">
         {toasts.map((toast) => (
           <Toast

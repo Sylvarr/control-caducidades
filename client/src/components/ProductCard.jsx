@@ -27,6 +27,9 @@ const ProductCard = ({
   onUpdateClick,
   onDeleteClick,
 }) => {
+  // Determinar si el producto está clasificado o no
+  const isClassified = product.estado !== "sin-clasificar";
+
   return (
     <div
       data-product-id={product.producto?._id}
@@ -66,102 +69,104 @@ const ProductCard = ({
         )}
       </div>
 
-      {/* Contenido expandible */}
-      <div
-        className={`
-        transform transition-all duration-300
-        ${isSelected ? "max-h-[500px] opacity-100 mt-4" : "max-h-0 opacity-0"}
-        overflow-hidden
-      `}
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            {product.fechaFrente && (
-              <div className="bg-[#f8f8f8] rounded-md p-3">
-                <div
-                  className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
-                  text-[14px] font-semibold mb-2 select-none"
-                >
-                  FRENTE
-                </div>
-                <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
-                  {formatDate(product.fechaFrente)}
-                </div>
-              </div>
-            )}
-            {product.fechaAlmacen && (
-              <div className="bg-[#f8f8f8] rounded-md p-3">
-                <div
-                  className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
-                  text-[14px] font-semibold mb-2 select-none"
-                >
-                  ALMACÉN
-                </div>
-                <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
-                  {formatDate(product.fechaAlmacen)}
-                </div>
-              </div>
-            )}
-          </div>
-          {(product.hayOtrasFechas || product.cajaUnica) && (
-            <div className="flex flex-wrap gap-2">
-              {product.hayOtrasFechas && (
-                <div
-                  className="inline-flex items-center px-2.5 py-1 rounded-md
-                  bg-[#1d5030]/5 text-[#1d5030] text-sm select-none"
-                >
-                  <Clock className="w-3.5 h-3.5 mr-1" />
-                  Hay otras fechas
+      {/* Contenido expandible - solo para productos clasificados */}
+      {isClassified && (
+        <div
+          className={`
+          transform transition-all duration-300
+          ${isSelected ? "max-h-[500px] opacity-100 mt-4" : "max-h-0 opacity-0"}
+          overflow-hidden
+        `}
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              {product.fechaFrente && (
+                <div className="bg-[#f8f8f8] rounded-md p-3">
+                  <div
+                    className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
+                    text-[14px] font-semibold mb-2 select-none"
+                  >
+                    FRENTE
+                  </div>
+                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
+                    {formatDate(product.fechaFrente)}
+                  </div>
                 </div>
               )}
-              {product.cajaUnica && (
-                <div
-                  className="inline-flex items-center px-2.5 py-1 rounded-md
-                  bg-[#ffb81c]/5 text-[#1d5030] text-sm select-none"
-                >
-                  <Box className="w-3.5 h-3.5 mr-1" />
-                  Última caja
+              {product.fechaAlmacen && (
+                <div className="bg-[#f8f8f8] rounded-md p-3">
+                  <div
+                    className="inline-block bg-[#1d5030]/10 px-2 py-1 rounded text-[#1d5030] 
+                    text-[14px] font-semibold mb-2 select-none"
+                  >
+                    ALMACÉN
+                  </div>
+                  <div className="text-xl font-bold text-[#1a1a1a] leading-tight select-none">
+                    {formatDate(product.fechaAlmacen)}
+                  </div>
                 </div>
               )}
             </div>
-          )}
-          <div className="flex items-center justify-between pt-2">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onUpdateClick(product, e);
-              }}
-              className="flex-1 py-2 text-white rounded-md
-                bg-[#1d5030] hover:bg-[#1d5030]/90
-                transition-colors duration-200
-                font-medium text-sm select-none
-                flex items-center justify-center gap-1.5
-                shadow-sm hover:shadow
-                mr-2"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              Actualizar Estado
-            </button>
-            {(product.estado !== "sin-clasificar" ||
-              product.fechaFrente ||
-              product.fechaAlmacen) && (
+            {(product.hayOtrasFechas || product.cajaUnica) && (
+              <div className="flex flex-wrap gap-2">
+                {product.hayOtrasFechas && (
+                  <div
+                    className="inline-flex items-center px-2.5 py-1 rounded-md
+                    bg-[#1d5030]/5 text-[#1d5030] text-sm select-none"
+                  >
+                    <Clock className="w-3.5 h-3.5 mr-1" />
+                    Hay otras fechas
+                  </div>
+                )}
+                {product.cajaUnica && (
+                  <div
+                    className="inline-flex items-center px-2.5 py-1 rounded-md
+                    bg-[#ffb81c]/5 text-[#1d5030] text-sm select-none"
+                  >
+                    <Box className="w-3.5 h-3.5 mr-1" />
+                    Última caja
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-2">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDeleteClick(product, e);
+                  onUpdateClick(product, e);
                 }}
-                className="min-w-[48px] h-[40px] flex items-center justify-center
-                  text-gray-400 rounded-md
-                  hover:text-red-500 hover:bg-red-50
+                className="flex-1 py-2 text-white rounded-md
+                  bg-[#1d5030] hover:bg-[#1d5030]/90
                   transition-colors duration-200
-                  active:bg-red-100"
+                  font-medium text-sm select-none
+                  flex items-center justify-center gap-1.5
+                  shadow-sm hover:shadow
+                  mr-2"
               >
-                <Trash2 className="w-5 h-5" />
+                <Edit3 className="w-3.5 h-3.5" />
+                Actualizar Estado
               </button>
-            )}
+              {(product.estado !== "sin-clasificar" ||
+                product.fechaFrente ||
+                product.fechaAlmacen) && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteClick(product, e);
+                  }}
+                  className="min-w-[48px] h-[40px] flex items-center justify-center
+                    text-gray-400 rounded-md
+                    hover:text-red-500 hover:bg-red-50
+                    transition-colors duration-200
+                    active:bg-red-100"
+                >
+                  <Trash2 className="w-5 h-5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
