@@ -20,19 +20,35 @@ exports.getAllProducts = async (req, res) => {
 
 // Añadir nuevo producto al catálogo
 exports.addProduct = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
     const newProduct = new CatalogProduct(req.body);
-    const savedProduct = await newProduct.save();
-    logger.info(`Producto añadido al catálogo: ${savedProduct.nombre}`);
+    const savedProduct = await newProduct.save({ session });
+
+    const newStatus = new ProductStatus({
+      producto: savedProduct._id,
+      estado: "sin-clasificar",
+    });
+    const savedStatus = await newStatus.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    logger.info(`Producto añadido al catálogo y estado inicial creado: ${savedProduct.nombre}`);
+
+    const populatedStatus = await ProductStatus.findById(savedStatus._id).populate("producto");
 
     const io = req.app.get('io');
     io.emit("catalogUpdate", {
       type: "create",
-      product: savedProduct,
+      productStatus: populatedStatus,
     });
 
-    res.status(201).json(savedProduct);
+    res.status(201).json(populatedStatus);
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     logger.error({ error, body: req.body }, "Error al añadir producto al catálogo");
     res
       .status(400)

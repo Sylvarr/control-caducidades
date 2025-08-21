@@ -325,12 +325,10 @@ const ProductList = () => {
 
     const handleCatalogUpdate = (data) => {
       console.log("Recibida actualización de catálogo en ProductList:", data);
-      if (data.type === "create" || data.type === "update") {
-        // Para creaciones y actualizaciones, añadimos el producto como sin clasificar
-        addProductToState({
-          producto: data.product,
-          estado: "sin-clasificar",
-        });
+      if (data.type === "create") {
+        addProductToState(data.productStatus);
+      } else if (data.type === "update") {
+        updateProductInState(data.productStatus);
       } else if (data.type === "delete") {
         removeProductFromState(data.productId);
       }
