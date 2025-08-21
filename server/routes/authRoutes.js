@@ -1,11 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
-const {
-  loginLimiter,
-  verifyToken,
-  isSupervisor,
-} = require("../middleware/auth");
+const { verifyToken, isSupervisor } = require("../middleware/auth");
 
 // Health check endpoint (debe estar antes del middleware de autenticación)
 router.get("/health", (req, res) => {
@@ -13,7 +9,7 @@ router.get("/health", (req, res) => {
 });
 
 // Rutas públicas
-router.post("/login", loginLimiter, authController.login);
+router.post("/login", authController.login);
 
 // Rutas protegidas
 router.use(verifyToken);
