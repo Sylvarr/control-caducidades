@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useContext } from "react";
 import { io } from "socket.io-client";
 import PropTypes from "prop-types";
 import SocketContext from "../SocketContext";
-import { AuthContext } from "../../contexts/AuthContext";
+import AuthContext from "../../contexts/AuthContext";
 
 const SOCKET_URL = import.meta.env.PROD
   ? window.location.origin
