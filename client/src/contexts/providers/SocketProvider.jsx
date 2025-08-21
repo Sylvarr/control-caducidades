@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useContext } from "react";
 import { io } from "socket.io-client";
 import PropTypes from "prop-types";
 import SocketContext from "../SocketContext";
+import { AuthContext } from "../../contexts/AuthContext";
 
 const SOCKET_URL = import.meta.env.PROD
   ? window.location.origin
@@ -12,43 +13,31 @@ const RECONNECTION_DELAY = 1000;
 const RECONNECTION_DELAY_MAX = 5000;
 
 export const SocketProvider = ({ children }) => {
+  const { token } = useContext(AuthContext);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const [error, setError] = useState(null);
 
-  // Función para manejar la reconexión
   const handleReconnect = useCallback((attemptNumber) => {
-    console.log(`Intento de reconexión #${attemptNumber}`);
+    if (import.meta.env.DEV) {
+      console.log(`Intento de reconexión #${attemptNumber}`);
+    }
     setReconnectAttempt(attemptNumber);
   }, []);
 
-  // Función para manejar errores de conexión
-  const handleConnectionError = useCallback(
-    (error) => {
+  const handleConnectionError = useCallback((error) => {
+    if (import.meta.env.DEV) {
       console.error("Error de conexión WebSocket:", error);
-      setIsConnected(false);
-      setError(error.message);
+    }
+    setIsConnected(false);
+    setError(error.message);
+  }, []);
 
-      // Si alcanzamos el máximo de intentos, mostrar error
-      if (reconnectAttempt >= RECONNECTION_ATTEMPTS) {
-        console.error(
-          "No se pudo establecer conexión después de múltiples intentos"
-        );
-      }
-    },
-    [reconnectAttempt]
-  );
-
-  // Función para limpiar el estado
   const cleanupSocket = useCallback((socketInstance) => {
     if (!socketInstance) return;
-
-    // Remover todos los listeners
     socketInstance.removeAllListeners();
-    // Desconectar el socket
     socketInstance.disconnect();
-    // Limpiar el estado
     setSocket(null);
     setIsConnected(false);
     setError(null);
@@ -56,8 +45,15 @@ export const SocketProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    // Crear conexión Socket.IO con opciones mejoradas
+    if (!token) {
+      if (socket) {
+        cleanupSocket(socket);
+      }
+      return;
+    }
+
     const socketInstance = io(SOCKET_URL, {
+      auth: { token },
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: RECONNECTION_ATTEMPTS,
@@ -66,41 +62,35 @@ export const SocketProvider = ({ children }) => {
       timeout: 10000,
     });
 
-    // Manejar eventos de conexión
     socketInstance.on("connect", () => {
-      console.log("WebSocket conectado exitosamente");
+      if (import.meta.env.DEV) {
+        console.log("WebSocket conectado exitosamente");
+      }
       setIsConnected(true);
       setError(null);
       setReconnectAttempt(0);
     });
 
     socketInstance.on("disconnect", (reason) => {
-      console.log("WebSocket desconectado:", reason);
-      setIsConnected(false);
-
-      // Manejar diferentes razones de desconexión
-      if (reason === "io server disconnect") {
-        // El servidor forzó la desconexión
-        console.log("Desconexión forzada por el servidor");
-      } else if (reason === "transport close") {
-        // Conexión perdida, intentará reconectar automáticamente
-        console.log("Conexión perdida, intentando reconectar...");
+      if (import.meta.env.DEV) {
+        console.log("WebSocket desconectado:", reason);
       }
+      setIsConnected(false);
     });
 
     socketInstance.on("connect_error", handleConnectionError);
-    socketInstance.on("reconnect", handleReconnect);
     socketInstance.on("reconnect_attempt", handleReconnect);
     socketInstance.on("reconnect_failed", () => {
-      console.error("Falló la reconexión después de todos los intentos");
+      if (import.meta.env.DEV) {
+        console.error("Falló la reconexión después de todos los intentos");
+      }
       setError("No se pudo restablecer la conexión");
     });
 
     setSocket(socketInstance);
 
-    // Cleanup al desmontar
     return () => cleanupSocket(socketInstance);
-  }, [handleConnectionError, handleReconnect, cleanupSocket]);
+  }, [token, handleConnectionError, handleReconnect, cleanupSocket, socket]);
 
   const value = {
     socket,
