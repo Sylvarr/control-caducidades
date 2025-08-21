@@ -5,46 +5,31 @@ const path = require("path");
 const http = require("http");
 const { setupSocket } = require("./socket");
 const rateLimit = require("express-rate-limit");
+const logger = require("./logger");
 
 // Cargar variables de entorno según el entorno
-console.log("Directorio actual:", __dirname);
 const envPath = path.join(
   __dirname,
   process.env.NODE_ENV === "production" ? ".env.production" : ".env"
 );
-console.log("Intentando cargar archivo de variables de entorno:", envPath);
 
 try {
   require("dotenv").config({ path: envPath });
-  console.log("Variables de entorno cargadas desde:", envPath);
+  logger.info(`Variables de entorno cargadas desde: ${envPath}`);
 } catch (error) {
-  console.error("Error al cargar variables de entorno:", error);
+  logger.error("Error al cargar variables de entorno:", error);
 }
 
 // Verificar variables de entorno requeridas
-console.log("Verificando variables de entorno...");
-console.log("Variables disponibles:", {
-  NODE_ENV: process.env.NODE_ENV,
-  JWT_SECRET: process.env.JWT_SECRET ? "[PRESENTE]" : "[AUSENTE]",
-  MONGODB_URI: process.env.MONGODB_URI ? "[PRESENTE]" : "[AUSENTE]",
-  CORS_ORIGIN: process.env.CORS_ORIGIN ? "[PRESENTE]" : "[AUSENTE]",
-});
-
 const requiredEnvVars = ["JWT_SECRET", "MONGODB_URI"];
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  console.error(
-    "Error: Faltan variables de entorno requeridas:",
-    missingEnvVars
-  );
+  logger.error("Error: Faltan variables de entorno requeridas:", missingEnvVars);
   process.exit(1);
 }
 
-console.log("Variables de entorno cargadas correctamente");
-console.log("NODE_ENV:", process.env.NODE_ENV);
-console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
-console.log("MONGODB_URI disponible:", !!process.env.MONGODB_URI);
+logger.info("Variables de entorno cargadas correctamente");
 
 const catalogRoutes = require("./routes/catalogRoutes");
 const statusRoutes = require("./routes/statusRoutes");
@@ -67,23 +52,10 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // En desarrollo, permitir solicitudes sin origin
-    if (process.env.NODE_ENV !== "production" && !origin) {
-      return callback(null, true);
-    }
-
-    // En producción, permitir solicitudes del mismo origen
-    if (process.env.NODE_ENV === "production" && !origin) {
-      return callback(null, true);
-    }
-
-    console.log("Origin recibido:", origin);
-    console.log("Origins permitidos:", allowedOrigins);
-
     if (allowedOrigins.includes(origin) || !origin) {
       callback(null, true);
     } else {
-      console.log("Origin bloqueado:", origin);
+      logger.warn(`Origin bloqueado por CORS: ${origin}`);
       callback(new Error("Not allowed by CORS"));
     }
   },
@@ -97,32 +69,22 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Configurar Socket.IO
-setupSocket(server, allowedOrigins);
+const io = setupSocket(server, allowedOrigins);
+app.set('io', io);
 
 // Middleware
 app.use(express.json());
 
-// Middleware de logging global (solo en desarrollo)
-if (process.env.NODE_ENV === "development") {
-  app.use((req, res, next) => {
-    console.log("\n=== Petición recibida ===");
-    console.log("Método:", req.method);
-    console.log("URL:", req.originalUrl);
-    console.log("Headers:", req.headers);
-    console.log("======================\n");
-    next();
-  });
-}
+// Middleware de logging de peticiones
+app.use((req, res, next) => {
+  logger.info({ req: { method: req.method, url: req.originalUrl, headers: req.headers } }, `Petición recibida: ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // Servir archivos estáticos en producción
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../client/dist")));
 }
-
-app.use((req, res, next) => {
-  console.log("CORS Middleware: Request received for:", req.originalUrl);
-  next();
-});
 
 // Configurar rate limiter
 const limiter = rateLimit({
@@ -135,6 +97,7 @@ const limiter = rateLimit({
     details: "Se ha excedido el límite de solicitudes permitidas.",
   },
   handler: (req, res) => {
+    logger.warn(`Rate limit excedido para la IP: ${req.ip}`);
     res.status(429).json({
       error: "Demasiadas solicitudes, por favor intente más tarde.",
       details: "Se ha excedido el límite de solicitudes permitidas.",
@@ -153,6 +116,7 @@ const authLimiter = rateLimit({
     details: "Por favor, espere antes de intentar nuevamente.",
   },
   handler: (req, res) => {
+    logger.warn(`Rate limit de autenticación excedido para la IP: ${req.ip}`);
     res.status(429).json({
       error: "Demasiados intentos de inicio de sesión.",
       details: "Por favor, espere antes de intentar nuevamente.",
@@ -182,7 +146,7 @@ if (process.env.NODE_ENV === "production") {
 
 // Manejo de errores global
 app.use((err, req, res, _next) => {
-  console.error(err.stack);
+  logger.error(err.stack);
 
   if (err.name === "ValidationError") {
     return res.status(400).json({
@@ -206,7 +170,7 @@ app.use((err, req, res, _next) => {
 
 // Manejo de rutas no encontradas
 app.use((req, res) => {
-  console.log("Ruta no encontrada:", req.originalUrl);
+  logger.warn(`Ruta no encontrada: ${req.originalUrl}`);
   res.status(404).json({ error: "Ruta no encontrada" });
 });
 
@@ -217,55 +181,21 @@ const connectWithRetry = async () => {
 
   while (retries < maxRetries) {
     try {
-      console.log("Intentando conectar a MongoDB...");
-      console.log("MONGODB_URI disponible:", !!process.env.MONGODB_URI);
-      console.log("NODE_ENV:", process.env.NODE_ENV);
-
+      logger.info("Intentando conectar a MongoDB...");
       await mongoose.connect(process.env.MONGODB_URI);
-
-      console.log("Conectado a MongoDB exitosamente");
-      console.log("Base de datos:", mongoose.connection.name);
-      console.log("Host:", mongoose.connection.host);
-
-      // Crear usuario admin si no existe
-      const User = require("./models/User");
-      const adminExists = await User.findOne({ username: "admin" });
-
-      if (!adminExists) {
-        console.log("Usuario admin no encontrado, creando...");
-        const admin = new User({
-          username: "admin",
-          password: "admin123456",
-          role: "supervisor",
-          restaurante: "Restaurante",
-        });
-
-        try {
-          await admin.save();
-          console.log("Usuario admin creado exitosamente");
-        } catch (error) {
-          console.error("Error al crear usuario admin:", error);
-        }
-      } else {
-        console.log("Usuario admin ya existe");
-      }
-
+      logger.info("Conectado a MongoDB exitosamente");
       break;
     } catch (err) {
       retries++;
-      console.error(
-        `Error conectando a MongoDB (intento ${retries}/${maxRetries}):`,
-        err.message
+      logger.error(
+        `Error conectando a MongoDB (intento ${retries}/${maxRetries}): ${err.message}`
       );
-      console.error("Stack trace:", err.stack);
-
       if (retries === maxRetries) {
-        console.error(
+        logger.error(
           "No se pudo conectar a MongoDB después de múltiples intentos"
         );
         process.exit(1);
       }
-      // Esperar 5 segundos antes de reintentar
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
@@ -276,13 +206,5 @@ connectWithRetry();
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-  console.log("Variables de entorno cargadas:", {
-    NODE_ENV: process.env.NODE_ENV,
-    JWT_SECRET: process.env.JWT_SECRET ? "Configurado" : "No configurado",
-    MONGODB_URI: process.env.MONGODB_URI ? "Configurado" : "No configurado",
-    CORS_ORIGIN: process.env.CORS_ORIGIN,
-  });
+  logger.info(`Servidor corriendo en puerto ${PORT}`);
 });
-
-console.log("CORS_ORIGIN:", process.env.CORS_ORIGIN);

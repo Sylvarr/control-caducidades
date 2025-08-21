@@ -1,55 +1,43 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const logger = require("../logger");
 
 // Login
 exports.login = async (req, res) => {
   try {
-    console.log("Inicio de solicitud de login");
     const { username, password } = req.body;
-    console.log("Datos recibidos:", { username, password: "***" });
+    logger.info(`Intento de login para el usuario: ${username}`);
 
-    // Validar entrada
     if (!username || !password) {
-      console.log("Error: Faltan credenciales");
+      logger.warn("Intento de login con credenciales faltantes");
       return res.status(400).json({
         error: "Usuario y contraseña son requeridos",
       });
     }
 
-    // Buscar usuario
-    console.log("Buscando usuario en la base de datos...");
     const user = await User.findOne({ username }).select("+password");
-    console.log("Usuario encontrado:", user ? "Sí" : "No");
 
     if (!user) {
-      console.log("Error: Usuario no encontrado");
+      logger.warn(`Intento de login para usuario no existente: ${username}`);
       return res.status(401).json({
         error: "Credenciales inválidas",
       });
     }
 
-    // Verificar contraseña
-    console.log("Verificando contraseña...");
     const isMatch = await bcrypt.compare(password, user.password);
-    console.log("Contraseña válida:", isMatch ? "Sí" : "No");
 
     if (!isMatch) {
-      console.log("Error: Contraseña incorrecta");
+      logger.warn(`Intento de login con contraseña incorrecta para: ${username}`);
       return res.status(401).json({
         error: "Credenciales inválidas",
       });
     }
 
-    // Generar token
-    console.log("Generando token JWT...");
-    console.log("JWT_SECRET disponible:", !!process.env.JWT_SECRET);
-
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET no está definido");
+      logger.error("JWT_SECRET no está definido en el entorno");
       return res.status(500).json({
         error: "Error de configuración del servidor",
-        details: "JWT_SECRET no está configurado",
       });
     }
 
@@ -62,10 +50,8 @@ exports.login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    console.log("Token generado exitosamente");
+    logger.info(`Login exitoso para el usuario: ${username}`);
 
-    // Enviar respuesta
-    console.log("Enviando respuesta exitosa");
     res.json({
       token,
       user: {
@@ -75,32 +61,21 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    const errorInfo = {
-      message: error.message,
-      type: error.name,
-      code: error.code,
-      env: {
-        NODE_ENV: process.env.NODE_ENV,
-        JWT_SECRET_EXISTS: !!process.env.JWT_SECRET,
-        MONGODB_URI_EXISTS: !!process.env.MONGODB_URI,
-      },
-    };
-
-    console.error("Error detallado en login:", errorInfo);
-    console.error("Stack trace:", error.stack);
-
-    // Siempre devolver los detalles del error
-    return res.status(500).json(errorInfo);
+    logger.error({ error }, "Error en el proceso de login");
+    return res.status(500).json({ error: "Error interno del servidor" });
   }
 };
 
 // Obtener usuario actual
 exports.getCurrentUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
     res.json(user);
   } catch (error) {
-    console.error("Error al obtener usuario actual:", error);
+    logger.error({ error, userId: req.user.id }, "Error al obtener usuario actual");
     res.status(500).json({
       error: "Error al obtener usuario",
     });
@@ -112,14 +87,12 @@ exports.changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    // Validar entrada
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         error: "Contraseña actual y nueva son requeridas",
       });
     }
 
-    // Buscar usuario
     const user = await User.findById(req.user.id).select("+password");
     if (!user) {
       return res.status(404).json({
@@ -127,7 +100,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Verificar contraseña actual
     const isMatch = await bcrypt.compare(currentPassword, user.password);
     if (!isMatch) {
       return res.status(401).json({
@@ -135,15 +107,15 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Actualizar contraseña
     user.password = newPassword;
     await user.save();
+    logger.info(`Contraseña actualizada para el usuario: ${user.username}`);
 
     res.json({
       message: "Contraseña actualizada correctamente",
     });
   } catch (error) {
-    console.error("Error al cambiar contraseña:", error);
+    logger.error({ error, userId: req.user.id }, "Error al cambiar contraseña");
     res.status(500).json({
       error: "Error al cambiar contraseña",
     });
@@ -153,10 +125,10 @@ exports.changePassword = async (req, res) => {
 // Obtener todos los usuarios (solo supervisor)
 exports.getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password");
+    const users = await User.find();
     res.json(users);
   } catch (error) {
-    console.error("Error al obtener usuarios:", error);
+    logger.error({ error }, "Error al obtener todos los usuarios");
     res.status(500).json({
       error: "Error al obtener usuarios",
     });
@@ -167,35 +139,20 @@ exports.getAllUsers = async (req, res) => {
 exports.createUser = async (req, res) => {
   try {
     const { username, password, role, restaurante } = req.body;
-    console.log("Datos recibidos:", { username, role, restaurante });
 
-    // Validar entrada
     if (!username || !password || !role) {
-      console.log("Campos faltantes:", {
-        username: !username,
-        password: !password,
-        role: !role,
-      });
       return res.status(400).json({
         error: "Todos los campos son requeridos",
-        details: {
-          username: !username ? "Falta el nombre de usuario" : null,
-          password: !password ? "Falta la contraseña" : null,
-          role: !role ? "Falta el rol" : null,
-        },
       });
     }
 
-    // Verificar si el usuario ya existe
     const existingUser = await User.findOne({ username });
     if (existingUser) {
-      console.log("Usuario existente encontrado:", existingUser.username);
       return res.status(400).json({
         error: "El usuario ya existe",
       });
     }
 
-    // Crear usuario
     const user = new User({
       username,
       password,
@@ -203,47 +160,29 @@ exports.createUser = async (req, res) => {
       restaurante,
     });
 
-    try {
-      await user.save();
-      console.log("Usuario creado exitosamente:", user);
+    await user.save();
+    logger.info(`Nuevo usuario creado: ${username}`);
 
-      // Emitir evento de socket para la actualización
-      if (global.io) {
-        global.io.emit("userUpdate", {
-          type: "create",
-          user: {
-            id: user._id,
-            username: user.username,
-            role: user.role,
-            restaurante: user.restaurante,
-          },
-        });
-      }
+    const io = req.app.get('io');
+    io.to("supervisors").emit("userUpdate", {
+      type: "create",
+      user: user.toJSON(),
+    });
 
-      res.status(201).json({
-        message: "Usuario creado correctamente",
-        user: {
-          id: user._id,
-          username: user.username,
-          role: user.role,
-          restaurante: user.restaurante,
-        },
-      });
-    } catch (saveError) {
-      console.error("Error al guardar usuario:", saveError);
-      if (saveError.name === "ValidationError") {
-        return res.status(400).json({
-          error: "Error de validación",
-          details: Object.values(saveError.errors).map((err) => err.message),
-        });
-      }
-      throw saveError;
-    }
+    res.status(201).json({
+      message: "Usuario creado correctamente",
+      user: user.toJSON(),
+    });
   } catch (error) {
-    console.error("Error detallado al crear usuario:", error);
+    logger.error({ error, body: req.body }, "Error al crear usuario");
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        error: "Error de validación",
+        details: Object.values(error.errors).map((err) => err.message),
+      });
+    }
     res.status(500).json({
       error: "Error al crear usuario",
-      details: error.message,
     });
   }
 };
@@ -254,14 +193,12 @@ exports.updateUser = async (req, res) => {
     const { username, role } = req.body;
     const userId = req.params.id;
 
-    // Validar entrada
     if (!username || !role) {
       return res.status(400).json({
         error: "Nombre de usuario y rol son requeridos",
       });
     }
 
-    // Verificar si el usuario existe
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -269,33 +206,23 @@ exports.updateUser = async (req, res) => {
       });
     }
 
-    // Actualizar usuario
     user.username = username;
     user.role = role;
     await user.save();
+    logger.info(`Usuario actualizado: ${username}`);
 
-    // Emitir evento de socket para la actualización
-    if (global.io) {
-      global.io.emit("userUpdate", {
-        type: "update",
-        user: {
-          id: user._id,
-          username: user.username,
-          role: user.role,
-        },
-      });
-    }
+    const io = req.app.get('io');
+    io.to("supervisors").emit("userUpdate", {
+      type: "update",
+      user: user.toJSON(),
+    });
 
     res.json({
       message: "Usuario actualizado correctamente",
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role,
-      },
+      user: user.toJSON(),
     });
   } catch (error) {
-    console.error("Error al actualizar usuario:", error);
+    logger.error({ error, params: req.params, body: req.body }, "Error al actualizar usuario");
     res.status(500).json({
       error: "Error al actualizar usuario",
     });
@@ -307,7 +234,6 @@ exports.deleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Verificar si el usuario existe
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
@@ -315,7 +241,6 @@ exports.deleteUser = async (req, res) => {
       });
     }
 
-    // No permitir eliminar al último supervisor
     if (user.role === "supervisor") {
       const supervisorCount = await User.countDocuments({ role: "supervisor" });
       if (supervisorCount <= 1) {
@@ -326,20 +251,19 @@ exports.deleteUser = async (req, res) => {
     }
 
     await user.deleteOne();
+    logger.info(`Usuario eliminado: ${user.username}`);
 
-    // Emitir evento de socket para la actualización
-    if (global.io) {
-      global.io.emit("userUpdate", {
-        type: "delete",
-        userId: userId,
-      });
-    }
+    const io = req.app.get('io');
+    io.to("supervisors").emit("userUpdate", {
+      type: "delete",
+      userId: userId,
+    });
 
     res.json({
       message: "Usuario eliminado correctamente",
     });
   } catch (error) {
-    console.error("Error al eliminar usuario:", error);
+    logger.error({ error, params: req.params }, "Error al eliminar usuario");
     res.status(500).json({
       error: "Error al eliminar usuario",
     });
