@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const logger = require('../logger');
 require('dotenv').config({ path: './.env' });
@@ -10,7 +9,7 @@ const createAdmin = async () => {
     logger.info('Conectado a MongoDB');
 
     const adminUsername = process.env.ADMIN_USERNAME || 'admin';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123456';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'adminpassword';
 
     const existingAdmin = await User.findOne({ username: adminUsername });
 
@@ -19,11 +18,9 @@ const createAdmin = async () => {
       return;
     }
 
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-
     const admin = new User({
       username: adminUsername,
-      password: hashedPassword,
+      password: adminPassword,
       role: 'supervisor',
       restaurante: 'Restaurante Principal',
     });

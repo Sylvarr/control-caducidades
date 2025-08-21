@@ -20,20 +20,15 @@ exports.getAllProducts = async (req, res) => {
 
 // Añadir nuevo producto al catálogo
 exports.addProduct = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
     const newProduct = new CatalogProduct(req.body);
-    const savedProduct = await newProduct.save({ session });
+    const savedProduct = await newProduct.save();
 
     const newStatus = new ProductStatus({
       producto: savedProduct._id,
       estado: "sin-clasificar",
     });
-    const savedStatus = await newStatus.save({ session });
-
-    await session.commitTransaction();
-    session.endSession();
+    const savedStatus = await newStatus.save();
 
     logger.info(`Producto añadido al catálogo y estado inicial creado: ${savedProduct.nombre}`);
 
@@ -47,8 +42,6 @@ exports.addProduct = async (req, res) => {
 
     res.status(201).json(populatedStatus);
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     logger.error({ error, body: req.body }, "Error al añadir producto al catálogo");
     res
       .status(400)
@@ -56,28 +49,19 @@ exports.addProduct = async (req, res) => {
   }
 };
 
-const mongoose = require("mongoose");
-
 // Eliminar un producto
 exports.deleteProduct = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
   try {
     const { id } = req.params;
 
-    const deletedProduct = await CatalogProduct.findByIdAndDelete(id, { session });
+    const deletedProduct = await CatalogProduct.findByIdAndDelete(id);
 
     if (!deletedProduct) {
-      await session.abortTransaction();
-      session.endSession();
       logger.warn(`Intento de eliminar un producto no encontrado: ${id}`);
       return res.status(404).json({ message: "Producto no encontrado" });
     }
 
-    await ProductStatus.deleteMany({ producto: id }, { session });
-
-    await session.commitTransaction();
-    session.endSession();
+    await ProductStatus.deleteMany({ producto: id });
 
     logger.info(`Producto eliminado del catálogo y estados asociados: ${id}`);
 
@@ -89,8 +73,6 @@ exports.deleteProduct = async (req, res) => {
 
     res.json({ message: "Producto eliminado correctamente" });
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
     logger.error({ error, params: req.params }, "Error al eliminar producto del catálogo");
     res
       .status(400)
